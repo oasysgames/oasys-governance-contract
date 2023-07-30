@@ -133,6 +133,7 @@ dist
 cache
 artifacts
 deployments
+typechain-types
 
 # Mac
 .DS_Store
