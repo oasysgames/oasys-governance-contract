@@ -41,7 +41,7 @@ contract PermissionedContractCreator is AccessControl {
             _setupRole(DEFAULT_ADMIN_ROLE, admins[i]);
         }
 
-        for (uint8 i = 0; i < admins.length; i++) {
+        for (uint8 i = 0; i < creators.length; i++) {
             require(creators[i] != address(0), "PCC: creator is zero");
             _setupRole(CONTRACT_CREATOR_ROLE, creators[i]);
         }
