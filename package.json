@@ -7,7 +7,8 @@
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "lint": "solhint 'contracts/**/*.sol'",
-    "fmt": "prettier --write --list-different '{contracts,test,tasks}/**/*.{sol,ts}'"
+    "fmt": "prettier --write --list-different '{contracts,test,tasks}/**/*.{sol,ts}'",
+    "slither": "slither . --filter-paths node_modules"
   },
   "repository": "git@github.com:oasysgames/oasys-governance-contract.git",
   "license": "GPL-3.0",

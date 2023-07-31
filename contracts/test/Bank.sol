@@ -18,6 +18,7 @@ contract Bank {
         balance -= amount;
 
         address payable receiver = payable(msg.sender);
+        // slither-disable-next-line arbitrary-send-eth, missing-zero-check
         receiver.transfer(amount);
     }
 }

@@ -47,6 +47,8 @@ contract PermissionedContractCreator is AccessControl {
         }
     }
 
+    // slither-disable-start locked-ether
+
     /**
      * @dev creates a new contract using the `CREATE2` opcode.
      * Only callers granted with the `CONTRACT_CREATOR_ROLE` are permitted to call it.
@@ -71,6 +73,8 @@ contract PermissionedContractCreator is AccessControl {
 
         emit ContractCreated(msg.sender, amount, salt, bytecode, addr);
     }
+
+    // slither-disable-end locked-ether
 
     /**
      * @dev computes the address of a contract that would be created using the `CREATE2` opcode.
