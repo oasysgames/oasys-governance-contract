@@ -3,14 +3,23 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
+import {ContractMetadataRegistory} from "./ContractMetadataRegistory.sol";
 
 /**
- * @title PermissionedContractCreator
+ * @title PermissionedContractFactory
  * @dev Contract that create other contracts using the `CREATE2` opcode,
  * with calls limited to a preauthorized set of addresses.
  * The contract creator role is managed by the default admin role.
+ *
+ * --- Who will be intended to be authorized? ---
+ * As an important note, initially,
+ * only the 'Oasys core team' is granted the permission to deploy contracts.
+ *
+ * It will take time to grant privileges to the Oasys council,
+ * so the Oasys team needs to lead them gradually,
+ * enabling them to judge which contracts should be deployed.
  */
-contract PermissionedContractCreator is AccessControl {
+contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory {
     /*************
      * Variables *
      *************/
@@ -54,12 +63,16 @@ contract PermissionedContractCreator is AccessControl {
      * Only callers granted with the `CONTRACT_CREATOR_ROLE` are permitted to call it.
      * The caller must send the expected new contract address for deployment.
      * If the expected address does not match the newly created one, the execution will be reverted.
+     *
+     * @param tag Registerd as metadata, we intended to set it as a contract name. this can be empty string
+     *
      */
     function create(
         uint256 amount,
         bytes32 salt,
         bytes memory bytecode,
-        address expected
+        address expected,
+        string calldata tag
     ) external payable onlyRole(CONTRACT_CREATOR_ROLE) returns (address addr) {
         require(msg.value == amount, "PCC: incorrect amount sent");
         // NOTE: Enables pre-funding of the address.
@@ -72,6 +85,9 @@ contract PermissionedContractCreator is AccessControl {
         require(addr == expected, "PCC: unexpected address");
 
         emit ContractCreated(msg.sender, amount, salt, bytecode, addr);
+
+        // register the metadata of the created contract
+        _registerMetadata(addr, msg.sender, tag);
     }
 
     // slither-disable-end locked-ether

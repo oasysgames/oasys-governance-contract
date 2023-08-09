@@ -6,14 +6,14 @@ import { BytesLike, zeroPadBytes, randomBytes, parseEther } from 'ethers'
 
 const generateSalt = (): BytesLike => zeroPadBytes(randomBytes(32), 32)
 
-describe('PermissionedContractCreator', function () {
+describe('PermissionedContractFactory', function () {
   async function deployContractsFixture() {
     // admins and creators
     const [owner, creator1, creator2, newAdmin, newCreator] = await ethers.getSigners()
     const admins: HardhatEthersSigner[] = [owner]
     const creators: HardhatEthersSigner[] = [creator1, creator2]
     // deploy
-    const Creator = await ethers.getContractFactory('PermissionedContractCreator')
+    const Creator = await ethers.getContractFactory('PermissionedContractFactory')
     const creator = await Creator.deploy([owner.address], [creator1.address, creator2.address])
     // roles
     const adminRole = await creator.DEFAULT_ADMIN_ROLE()
@@ -41,11 +41,19 @@ describe('PermissionedContractCreator', function () {
       const initialCount = 42
       const deplyTx = await Counter.getDeployTransaction(initialCount)
       const salt = generateSalt()
+      const tag = 'Counter'
 
       const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
-      await expect(creator.connect(creators[0]).create(0, salt, deplyTx.data, expectedAddress))
+      const receipt = await creator.connect(creators[0]).create(0, salt, deplyTx.data, expectedAddress, tag)
+      await expect(receipt)
         .to.emit(creator, 'ContractCreated')
         .withArgs(creators[0].address, 0, salt, deplyTx.data, expectedAddress)
+      await expect(receipt).to.emit(creator, 'Registerd').withArgs(creators[0].address, expectedAddress, tag)
+
+      const metadata = await creator.getMetadata(expectedAddress)
+      expect(metadata.createdAddress).to.equal(expectedAddress)
+      expect(metadata.creator).to.equal(creators[0].address)
+      expect(metadata.tag).to.equal(tag)
 
       const counter = await ethers.getContractAt('Counter', expectedAddress)
       expect(await counter.get()).to.equal(initialCount)
@@ -62,10 +70,15 @@ describe('PermissionedContractCreator', function () {
       await expect(
         creator
           .connect(creators[0])
-          .create(initialDeposit, salt, deplyTx.data, expectedAddress, { value: initialDeposit }),
+          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', { value: initialDeposit }),
       )
         .to.emit(creator, 'ContractCreated')
         .withArgs(creators[0].address, initialDeposit, salt, deplyTx.data, expectedAddress)
+
+      expect(await creator.totalCreatedContract()).to.equal(1)
+      const metadata = await creator.getMetadataByIndex(0)
+      expect(metadata.createdAddress).to.equal(expectedAddress)
+      expect(metadata.tag).to.equal('')
 
       const bank = await ethers.getContractAt('Bank', expectedAddress)
       expect(await bank.balance()).to.equal(initialDeposit)
@@ -78,9 +91,9 @@ describe('PermissionedContractCreator', function () {
       const deplyTx = await Counter.getDeployTransaction(initialCount)
       const salt = generateSalt()
 
-      await expect(creator.connect(creators[0]).create(0, salt, deplyTx.data, creators[0].address)).to.be.revertedWith(
-        'PCC: unexpected address',
-      )
+      await expect(
+        creator.connect(creators[0]).create(0, salt, deplyTx.data, creators[0].address, ''),
+      ).to.be.revertedWith('PCC: unexpected address')
     })
 
     it('Should revert if sent amout does not match', async function () {
@@ -92,7 +105,7 @@ describe('PermissionedContractCreator', function () {
 
       const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
       await expect(
-        creator.connect(creators[0]).create(initialDeposit, salt, deplyTx.data, expectedAddress),
+        creator.connect(creators[0]).create(initialDeposit, salt, deplyTx.data, expectedAddress, ''),
       ).to.be.revertedWith('PCC: incorrect amount sent')
     })
   })
