@@ -108,6 +108,24 @@ describe('PermissionedContractFactory', function () {
         creator.connect(creators[0]).create(initialDeposit, salt, deplyTx.data, expectedAddress, ''),
       ).to.be.revertedWith('PCC: incorrect amount sent')
     })
+
+    it('Should revert if duplicated creation', async function () {
+      const { creator, creators } = await loadFixture(deployContractsFixture)
+      const Bank = await ethers.getContractFactory('Bank')
+      const initialDeposit = parseEther('42')
+      const deplyTx = await Bank.getDeployTransaction()
+      const salt = generateSalt()
+      const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
+      await creator
+        .connect(creators[0])
+        .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', { value: initialDeposit })
+
+      await expect(
+        creator
+          .connect(creators[0])
+          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', { value: initialDeposit }),
+      ).to.be.revertedWith('Create2: Failed on deploy')
+    })
   })
 
   describe('grantRole', function () {

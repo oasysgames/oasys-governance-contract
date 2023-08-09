@@ -36,9 +36,12 @@ contract ContractMetadataRegistory {
      * @dev register the metadata of a newly created contract.
      */
     function _registerMetadata(address createdAddress, address creator, string calldata tag) internal {
+        require(_allMetadata[createdAddress].creator == address(0), "already registered");
+
+        emit Registerd(creator, createdAddress, tag);
+
         _allCreatedAddress.push(createdAddress);
         _allMetadata[createdAddress] = ContractMetadata(createdAddress, creator, tag);
-        emit Registerd(creator, createdAddress, tag);
     }
 
     /**
