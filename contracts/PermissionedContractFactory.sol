@@ -79,6 +79,7 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         // require(expected.balance == 0, "PCC: expected is not empty");
 
         // create the contract using the provided bytecode and salt
+        // NOTE: in case of duplicate creation, the transaction will be reverted
         addr = Create2.deploy(amount, salt, bytecode);
 
         // revert if the deployed contract address does not match the expected address
