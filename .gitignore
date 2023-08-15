@@ -131,7 +131,8 @@ dist
 
 # Hardhat files
 cache
-artifacts
+# artifacts -> Disable to detect changes in the compiled bytecode of contracts
+build-info
 deployments
 typechain-types
 
@@ -139,3 +140,4 @@ typechain-types
 .DS_Store
 
 # Project Specific
+@openzeppelin
