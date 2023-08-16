@@ -131,10 +131,14 @@ dist
 
 # Hardhat files
 cache
-artifacts
+# artifacts -> Disable to detect changes in the compiled bytecode of contracts
+/artifacts/build-info
+/artifacts/**/*.dbg.json
 deployments
+typechain-types
 
 # Mac
 .DS_Store
 
 # Project Specific
+/artifacts/@openzeppelin

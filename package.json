@@ -6,8 +6,9 @@
     "build": "hardhat compile",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
-    "lint": "solhint 'contracts/**/*.sol' && prettier -c 'contracts/**/*.sol'",
-    "fmt": "prettier --write --list-different '{test,tasks}/**/*.{ts}'"
+    "lint": "solhint 'contracts/**/*.sol'",
+    "fmt": "prettier --write --list-different '{contracts,test,tasks}/**/*.{sol,ts}'",
+    "slither": "slither . --filter-paths node_modules"
   },
   "repository": "git@github.com:oasysgames/oasys-governance-contract.git",
   "license": "GPL-3.0",
@@ -29,6 +30,7 @@
     "ethers": "^6.4.0",
     "hardhat": "^2.17.0",
     "hardhat-gas-reporter": "^1.0.8",
+    "prettier-plugin-solidity": "^1.1.3",
     "solhint": "^3.4.1",
     "solidity-coverage": "^0.8.0",
     "ts-node": ">=8.0.0",
