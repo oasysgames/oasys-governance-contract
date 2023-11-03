@@ -20,6 +20,15 @@ import {ContractMetadataRegistory} from "./ContractMetadataRegistory.sol";
  * enabling them to judge which contracts should be deployed.
  */
 contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory {
+    // struct used for bulk contract creation
+    struct DeployContract {
+        uint256 amount;
+        bytes32 salt;
+        bytes bytecode;
+        address expected;
+        string tag;
+    }
+
     /*************
      * Variables *
      *************/
@@ -75,6 +84,46 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         string calldata tag
     ) external payable onlyRole(CONTRACT_CREATOR_ROLE) returns (address addr) {
         require(msg.value == amount, "PCC: incorrect amount sent");
+        return _create2(amount, salt, bytecode, expected, tag);
+    }
+
+    /**
+     * @dev creates multiple contracts using the `CREATE2` opcode.
+     */
+    function bulkCreate(DeployContract[] calldata deployContracts) external payable onlyRole(CONTRACT_CREATOR_ROLE) {
+        uint256 remaining = msg.value;
+        for (uint256 i = 0; i < deployContracts.length; i++) {
+            require(deployContracts[i].amount <= remaining, "PCC: insufficient amount sent");
+            remaining -= deployContracts[i].amount;
+            _create2(
+                deployContracts[i].amount,
+                deployContracts[i].salt,
+                deployContracts[i].bytecode,
+                deployContracts[i].expected,
+                deployContracts[i].tag
+            );
+        }
+        // assert that the sum of sent amount is equal to the total amount of bulk creation
+        require(remaining == 0, "PCC: too much amount sent");
+    }
+
+    // slither-disable-end locked-ether
+
+    /**
+     * @dev computes the address of a contract that would be created using the `CREATE2` opcode.
+     * The address is computed using the provided salt and bytecode.
+     */
+    function getDeploymentAddress(bytes32 salt, bytes memory bytecode) external view returns (address addr) {
+        addr = Create2.computeAddress(salt, keccak256(bytecode), address(this));
+    }
+
+    function _create2(
+        uint256 amount,
+        bytes32 salt,
+        bytes memory bytecode,
+        address expected,
+        string calldata tag
+    ) internal returns (address addr) {
         // NOTE: Enables pre-funding of the address.
         // require(expected.balance == 0, "PCC: expected is not empty");
 
@@ -89,15 +138,5 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
 
         // register the metadata of the created contract
         _registerMetadata(addr, msg.sender, tag);
-    }
-
-    // slither-disable-end locked-ether
-
-    /**
-     * @dev computes the address of a contract that would be created using the `CREATE2` opcode.
-     * The address is computed using the provided salt and bytecode.
-     */
-    function getDeploymentAddress(bytes32 salt, bytes memory bytecode) external view returns (address addr) {
-        addr = Create2.computeAddress(salt, keccak256(bytecode), address(this));
     }
 }

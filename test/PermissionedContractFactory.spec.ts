@@ -128,6 +128,127 @@ describe('PermissionedContractFactory', function () {
     })
   })
 
+  describe('bulkCreate', function () {
+    it('Should succeed to create multi new Counter contracts', async function () {
+      const { creator, creators } = await loadFixture(deployContractsFixture)
+      const Counter = await ethers.getContractFactory('Counter')
+      const initialCount = 42
+      const counterDeplyTx = await Counter.getDeployTransaction(initialCount)
+      const salt = generateSalt()
+      const counterTag = 'Counter'
+      const counterExAddr = await creator.getDeploymentAddress(salt, counterDeplyTx.data)
+
+      const Bank = await ethers.getContractFactory('Bank')
+      const initialDeposit = parseEther('42')
+      const bankDeplyTx = await Bank.getDeployTransaction()
+      const bankTag = 'Bank'
+      const bankExAddr = await creator.getDeploymentAddress(salt, bankDeplyTx.data)
+
+      await creator.connect(creators[0]).bulkCreate(
+        [
+          {
+            amount: 0,
+            salt,
+            bytecode: counterDeplyTx.data,
+            expected: counterExAddr,
+            tag: counterTag,
+          },
+          {
+            amount: initialDeposit,
+            salt,
+            bytecode: bankDeplyTx.data,
+            expected: bankExAddr,
+            tag: bankTag,
+          },
+        ],
+        { value: initialDeposit },
+      )
+
+      expect(await creator.totalCreatedContract()).to.equal(2)
+
+      let metadata = await creator.getMetadata(counterExAddr)
+      expect(metadata.createdAddress).to.equal(counterExAddr)
+      expect(metadata.creator).to.equal(creators[0].address)
+      expect(metadata.tag).to.equal(counterTag)
+
+      metadata = await creator.getMetadataByIndex(1)
+      expect(metadata.createdAddress).to.equal(bankExAddr)
+      expect(metadata.tag).to.equal(bankTag)
+
+      const counter = await ethers.getContractAt('Counter', counterExAddr)
+      expect(await counter.get()).to.equal(initialCount)
+
+      const bank = await ethers.getContractAt('Bank', bankExAddr)
+      expect(await bank.balance()).to.equal(initialDeposit)
+    })
+
+    it('Should revert if sent too much amout', async function () {
+      const { creator, creators } = await loadFixture(deployContractsFixture)
+      const Bank = await ethers.getContractFactory('Bank')
+      const initialDeposit = parseEther('42')
+      const deplyTx = await Bank.getDeployTransaction()
+      const salt1 = generateSalt()
+      const salt2 = generateSalt()
+
+      const expectedAddress1 = await creator.getDeploymentAddress(salt1, deplyTx.data)
+      const expectedAddress2 = await creator.getDeploymentAddress(salt2, deplyTx.data)
+      await expect(
+        creator.connect(creators[0]).bulkCreate(
+          [
+            {
+              amount: initialDeposit,
+              salt: salt1,
+              bytecode: deplyTx.data,
+              expected: expectedAddress1,
+              tag: '',
+            },
+            {
+              amount: initialDeposit,
+              salt: salt2,
+              bytecode: deplyTx.data,
+              expected: expectedAddress2,
+              tag: '',
+            },
+          ],
+          { value: initialDeposit * BigInt(3) },
+        ),
+      ).to.be.revertedWith('PCC: too much amount sent')
+    })
+
+    it('Should revert if insufficent amout sent', async function () {
+      const { creator, creators } = await loadFixture(deployContractsFixture)
+      const Bank = await ethers.getContractFactory('Bank')
+      const initialDeposit = parseEther('42')
+      const deplyTx = await Bank.getDeployTransaction()
+      const salt1 = generateSalt()
+      const salt2 = generateSalt()
+
+      const expectedAddress1 = await creator.getDeploymentAddress(salt1, deplyTx.data)
+      const expectedAddress2 = await creator.getDeploymentAddress(salt2, deplyTx.data)
+      await expect(
+        creator.connect(creators[0]).bulkCreate(
+          [
+            {
+              amount: initialDeposit,
+              salt: salt1,
+              bytecode: deplyTx.data,
+              expected: expectedAddress1,
+              tag: '',
+            },
+            {
+              amount: initialDeposit,
+              salt: salt2,
+              bytecode: deplyTx.data,
+              expected: expectedAddress2,
+              tag: '',
+            },
+          ],
+          { value: initialDeposit + parseEther('41') },
+        ),
+      ).to.be.revertedWith('PCC: insufficient amount sent')
+    })
+  })
+
   describe('grantRole', function () {
     it('Should succeed to grant admin role', async function () {
       const { creator, admins, newAdmin, adminRole } = await loadFixture(deployContractsFixture)
