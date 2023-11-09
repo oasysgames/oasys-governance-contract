@@ -48,14 +48,21 @@ contract ContractMetadataRegistory is IContractMetadataRegistory {
     }
 
     /**
-     * @dev Returns the number of created contracts.
+     * @dev Returns the number of created contracts including historical contracts.
      * if prevRegistory is set, it returns the sum of the number of created contracts of the previous version.
      */
     function totalCreatedContract() public view override returns (uint256 total) {
-        total = _allCreatedAddress.length;
+        total = totalCreatedContracFromThis();
         if (_prevRegistoryExists()) {
             total += prevRegistory.totalCreatedContract();
         }
+    }
+
+    /**
+     * @dev Returns the number of created contracts via this contract only.
+     */
+    function totalCreatedContracFromThis() public view returns (uint256 total) {
+        total = _allCreatedAddress.length;
     }
 
     /**
@@ -69,19 +76,9 @@ contract ContractMetadataRegistory is IContractMetadataRegistory {
     /**
      * @dev Returns the metadata of a created contract by index.
      */
-    function getMetadataByIndex(uint256 index) public view override returns (ContractMetadata memory) {
-        require(index <= totalCreatedContract() - 1, "index out of range");
-
-        if (!_prevRegistoryExists()) {
-            return _allMetadata[_allCreatedAddress[index]];
-        }
-
-        uint256 prevTotal = prevRegistory.totalCreatedContract();
-        if (index <= prevTotal - 1) {
-            return prevRegistory.getMetadataByIndex(index);
-        }
-
-        return _allMetadata[_allCreatedAddress[index - prevTotal]];
+    function getMetadataByIndex(uint256 index) public view returns (ContractMetadata memory) {
+        require(index <= totalCreatedContracFromThis() - 1, "index out of range");
+        return _allMetadata[_allCreatedAddress[index]];
     }
 
     function _prevRegistoryExists() internal view returns (bool) {
@@ -91,7 +88,15 @@ contract ContractMetadataRegistory is IContractMetadataRegistory {
     function _getMetadata(address createdAddress) internal view returns (ContractMetadata memory meta) {
         meta = _allMetadata[createdAddress];
         if (meta.creator == address(0) && _prevRegistoryExists()) {
-            meta = prevRegistory.getMetadata(createdAddress);
+            // try to get metadata from the previous version
+            try prevRegistory.getMetadata(createdAddress) returns (ContractMetadata memory prevMeta) {
+                meta = prevMeta;
+            } catch Error(string memory reason) {
+                // when it reverted, check the error message
+                // if the error message is "not found", it means the contract is not registered in the previous version
+                // don't revert in this case
+                require(keccak256(bytes(reason)) == keccak256(bytes("not found")), "unexpected error");
+            }
         }
     }
 }

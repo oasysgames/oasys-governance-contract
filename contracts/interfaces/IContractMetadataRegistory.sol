@@ -17,6 +17,4 @@ interface IContractMetadataRegistory {
     function totalCreatedContract() external view returns (uint256);
 
     function getMetadata(address createdAddress) external view returns (ContractMetadata memory meta);
-
-    function getMetadataByIndex(uint256 index) external view returns (ContractMetadata memory meta);
 }

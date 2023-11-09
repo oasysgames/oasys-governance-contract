@@ -40,42 +40,6 @@
       "type": "function"
     },
     {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "index",
-          "type": "uint256"
-        }
-      ],
-      "name": "getMetadataByIndex",
-      "outputs": [
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "createdAddress",
-              "type": "address"
-            },
-            {
-              "internalType": "address",
-              "name": "creator",
-              "type": "address"
-            },
-            {
-              "internalType": "string",
-              "name": "tag",
-              "type": "string"
-            }
-          ],
-          "internalType": "struct IContractMetadataRegistory.ContractMetadata",
-          "name": "meta",
-          "type": "tuple"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
       "inputs": [],
       "name": "totalCreatedContract",
       "outputs": [

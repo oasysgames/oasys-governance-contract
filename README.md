@@ -14,5 +14,5 @@ This is the first iteration of our governance contract. In this version, only wh
 ### Generate Deployment Bytecodes
 Obtain deployment bytecodes by running the `gencode` task. Below is a sample command line to do this:
 ```sh
-npx hardhat gencode --admins 0x00..,0x00.. --creators 0x00..,0x00..
+npx hardhat gencode --admins 0x00..,0x00.. --creators 0x00..,0x00.. --prev 0x00..
 ```

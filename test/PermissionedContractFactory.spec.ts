@@ -24,8 +24,8 @@ describe('PermissionedContractFactory', function () {
   }
 
   describe('Deployment', function () {
-    it('Should set the right admins and creators', async function () {
-      const { creator, admins, creators, adminRole, createRole } = await loadFixture(deployContractsFixture)
+    it('Should set the right admins and creators and prev and version', async function () {
+      const { creator, creatorV2, admins, creators, adminRole, createRole } = await loadFixture(deployContractsFixture)
 
       for (const admin of admins) {
         expect(await creator.hasRole(adminRole, admin)).to.be.true
@@ -33,6 +33,8 @@ describe('PermissionedContractFactory', function () {
       for (const _creator of creators) {
         expect(await creator.hasRole(createRole, _creator)).to.be.true
       }
+      expect(await creator.prevRegistory()).to.equal(ZERO_ADDRESS)
+      expect(await creatorV2.prevRegistory()).to.equal(creator.target)
       expect(await creator.version()).to.equal('0.0.2')
     })
   })
@@ -344,6 +346,69 @@ describe('PermissionedContractFactory', function () {
       await expect(creator.connect(creators[1]).revokeRole(createRole, creators[0].address)).to.be.revertedWith(
         `AccessControl: account ${creators[1].address.toLowerCase()} is missing role ${adminRole}`,
       )
+    })
+  })
+
+  describe('upgrade factory contract', function () {
+    it('Should the new verson continue hold previous version context', async function () {
+      const { creator, creatorV2, creators, newAdmin } = await loadFixture(deployContractsFixture)
+      const Counter = await ethers.getContractFactory('Counter')
+      const initialCount = 42
+      const counterDeplyTx = await Counter.getDeployTransaction(initialCount)
+      const salt = generateSalt()
+      const counterTag = 'Counter'
+      const counterExAddr = await creator.getDeploymentAddress(salt, counterDeplyTx.data)
+
+      const Bank = await ethers.getContractFactory('Bank')
+      const initialDeposit = parseEther('42')
+      const bankDeplyTx = await Bank.getDeployTransaction()
+      const bankTag = 'Bank'
+      const bankExAddr = await creator.getDeploymentAddress(salt, bankDeplyTx.data)
+
+      const BankPersonal = await ethers.getContractFactory('BankPersonal')
+      const pBankDeplyTx = await BankPersonal.getDeployTransaction()
+      const pBankTag = 'BankPersonal'
+      const pBankExAddr = await creatorV2.getDeploymentAddress(salt, pBankDeplyTx.data)
+
+      await creator.connect(creators[0]).bulkCreate(
+        [
+          {
+            amount: 0,
+            salt,
+            bytecode: counterDeplyTx.data,
+            expected: counterExAddr,
+            tag: counterTag,
+            owner: ZERO_ADDRESS,
+          },
+          {
+            amount: initialDeposit,
+            salt,
+            bytecode: bankDeplyTx.data,
+            expected: bankExAddr,
+            tag: bankTag,
+            owner: ZERO_ADDRESS,
+          },
+        ],
+        { value: initialDeposit },
+      )
+
+      await creatorV2
+        .connect(creators[0])
+        .create(initialDeposit, salt, pBankDeplyTx.data, pBankExAddr, pBankTag, newAdmin.address, {
+          value: initialDeposit,
+        })
+
+      expect(await creatorV2.totalCreatedContract()).to.equal(3)
+      expect(await creatorV2.totalCreatedContracFromThis()).to.equal(1)
+
+      let metadata = await creatorV2.getMetadata(counterExAddr)
+      expect(metadata.createdAddress).to.equal(counterExAddr)
+
+      metadata = await creatorV2.getMetadata(pBankExAddr)
+      expect(metadata.createdAddress).to.equal(pBankExAddr)
+
+      metadata = await creatorV2.getMetadataByIndex(0)
+      expect(metadata.createdAddress).to.equal(pBankExAddr)
     })
   })
 })
