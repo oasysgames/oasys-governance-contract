@@ -5,20 +5,22 @@ import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers'
 import { BytesLike, zeroPadBytes, randomBytes, parseEther } from 'ethers'
 
 const generateSalt = (): BytesLike => zeroPadBytes(randomBytes(32), 32)
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 describe('PermissionedContractFactory', function () {
   async function deployContractsFixture() {
     // admins and creators
-    const [owner, creator1, creator2, newAdmin, newCreator] = await ethers.getSigners()
-    const admins: HardhatEthersSigner[] = [owner]
+    const [admin, creator1, creator2, newAdmin, newCreator] = await ethers.getSigners()
+    const admins: HardhatEthersSigner[] = [admin]
     const creators: HardhatEthersSigner[] = [creator1, creator2]
     // deploy
     const Creator = await ethers.getContractFactory('PermissionedContractFactory')
-    const creator = await Creator.deploy([owner.address], [creator1.address, creator2.address])
+    const creator = await Creator.deploy([admin.address], [creator1.address, creator2.address], ZERO_ADDRESS)
+    const creatorV2 = await Creator.deploy([admin.address], [creator1.address, creator2.address], creator.target)
     // roles
     const adminRole = await creator.DEFAULT_ADMIN_ROLE()
     const createRole = await creator.CONTRACT_CREATOR_ROLE()
-    return { creator, admins, creators, newAdmin, newCreator, adminRole, createRole }
+    return { creator, creatorV2, admins, creators, newAdmin, newCreator, adminRole, createRole }
   }
 
   describe('Deployment', function () {
@@ -31,11 +33,12 @@ describe('PermissionedContractFactory', function () {
       for (const _creator of creators) {
         expect(await creator.hasRole(createRole, _creator)).to.be.true
       }
+      expect(await creator.version()).to.equal('0.0.2')
     })
   })
 
   describe('create', function () {
-    it('Should succeed to create new Counter contract', async function () {
+    it('Should succeed to create simple contract', async function () {
       const { creator, creators } = await loadFixture(deployContractsFixture)
       const Counter = await ethers.getContractFactory('Counter')
       const initialCount = 42
@@ -44,7 +47,9 @@ describe('PermissionedContractFactory', function () {
       const tag = 'Counter'
 
       const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
-      const receipt = await creator.connect(creators[0]).create(0, salt, deplyTx.data, expectedAddress, tag)
+      const receipt = await creator
+        .connect(creators[0])
+        .create(0, salt, deplyTx.data, expectedAddress, tag, ZERO_ADDRESS)
       await expect(receipt)
         .to.emit(creator, 'ContractCreated')
         .withArgs(creators[0].address, 0, salt, deplyTx.data, expectedAddress)
@@ -59,9 +64,9 @@ describe('PermissionedContractFactory', function () {
       expect(await counter.get()).to.equal(initialCount)
     })
 
-    it('Should succeed to create new Bank contract', async function () {
-      const { creator, creators } = await loadFixture(deployContractsFixture)
-      const Bank = await ethers.getContractFactory('Bank')
+    it('Should succeed to fund inital amount/transfer admin ship', async function () {
+      const { creator, creators, newAdmin } = await loadFixture(deployContractsFixture)
+      const Bank = await ethers.getContractFactory('BankPersonal')
       const initialDeposit = parseEther('42')
       const deplyTx = await Bank.getDeployTransaction()
       const salt = generateSalt()
@@ -70,7 +75,7 @@ describe('PermissionedContractFactory', function () {
       await expect(
         creator
           .connect(creators[0])
-          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', { value: initialDeposit }),
+          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', newAdmin.address, { value: initialDeposit }),
       )
         .to.emit(creator, 'ContractCreated')
         .withArgs(creators[0].address, initialDeposit, salt, deplyTx.data, expectedAddress)
@@ -80,8 +85,9 @@ describe('PermissionedContractFactory', function () {
       expect(metadata.createdAddress).to.equal(expectedAddress)
       expect(metadata.tag).to.equal('')
 
-      const bank = await ethers.getContractAt('Bank', expectedAddress)
+      const bank = await ethers.getContractAt('BankPersonal', expectedAddress)
       expect(await bank.balance()).to.equal(initialDeposit)
+      expect(await bank.owner()).to.equal(newAdmin.address)
     })
 
     it('Should revert with unexpected address', async function () {
@@ -92,7 +98,7 @@ describe('PermissionedContractFactory', function () {
       const salt = generateSalt()
 
       await expect(
-        creator.connect(creators[0]).create(0, salt, deplyTx.data, creators[0].address, ''),
+        creator.connect(creators[0]).create(0, salt, deplyTx.data, creators[0].address, '', ZERO_ADDRESS),
       ).to.be.revertedWith('PCC: unexpected address')
     })
 
@@ -105,7 +111,7 @@ describe('PermissionedContractFactory', function () {
 
       const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
       await expect(
-        creator.connect(creators[0]).create(initialDeposit, salt, deplyTx.data, expectedAddress, ''),
+        creator.connect(creators[0]).create(initialDeposit, salt, deplyTx.data, expectedAddress, '', ZERO_ADDRESS),
       ).to.be.revertedWith('PCC: incorrect amount sent')
     })
 
@@ -118,19 +124,33 @@ describe('PermissionedContractFactory', function () {
       const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
       await creator
         .connect(creators[0])
-        .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', { value: initialDeposit })
+        .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', ZERO_ADDRESS, { value: initialDeposit })
 
       await expect(
         creator
           .connect(creators[0])
-          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', { value: initialDeposit }),
+          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', ZERO_ADDRESS, { value: initialDeposit }),
       ).to.be.revertedWith('Create2: Failed on deploy')
+    })
+
+    it('Should revert if failed to transfer owner', async function () {
+      const { creator, creators, newAdmin } = await loadFixture(deployContractsFixture)
+      const Bank = await ethers.getContractFactory('Bank')
+      const initialDeposit = parseEther('42')
+      const deplyTx = await Bank.getDeployTransaction()
+      const salt = generateSalt()
+      const expectedAddress = await creator.getDeploymentAddress(salt, deplyTx.data)
+      await expect(
+        creator
+          .connect(creators[0])
+          .create(initialDeposit, salt, deplyTx.data, expectedAddress, '', newAdmin.address, { value: initialDeposit }),
+      ).to.be.revertedWithoutReason()
     })
   })
 
   describe('bulkCreate', function () {
     it('Should succeed to create multi new Counter contracts', async function () {
-      const { creator, creators } = await loadFixture(deployContractsFixture)
+      const { creator, creators, newAdmin } = await loadFixture(deployContractsFixture)
       const Counter = await ethers.getContractFactory('Counter')
       const initialCount = 42
       const counterDeplyTx = await Counter.getDeployTransaction(initialCount)
@@ -144,6 +164,11 @@ describe('PermissionedContractFactory', function () {
       const bankTag = 'Bank'
       const bankExAddr = await creator.getDeploymentAddress(salt, bankDeplyTx.data)
 
+      const BankPersonal = await ethers.getContractFactory('BankPersonal')
+      const pBankDeplyTx = await BankPersonal.getDeployTransaction()
+      const pBankTag = 'BankPersonal'
+      const pBankExAddr = await creator.getDeploymentAddress(salt, pBankDeplyTx.data)
+
       await creator.connect(creators[0]).bulkCreate(
         [
           {
@@ -152,6 +177,7 @@ describe('PermissionedContractFactory', function () {
             bytecode: counterDeplyTx.data,
             expected: counterExAddr,
             tag: counterTag,
+            owner: ZERO_ADDRESS,
           },
           {
             amount: initialDeposit,
@@ -159,12 +185,21 @@ describe('PermissionedContractFactory', function () {
             bytecode: bankDeplyTx.data,
             expected: bankExAddr,
             tag: bankTag,
+            owner: ZERO_ADDRESS,
+          },
+          {
+            amount: initialDeposit,
+            salt,
+            bytecode: pBankDeplyTx.data,
+            expected: pBankExAddr,
+            tag: pBankTag,
+            owner: newAdmin.address,
           },
         ],
-        { value: initialDeposit },
+        { value: initialDeposit * BigInt(2) },
       )
 
-      expect(await creator.totalCreatedContract()).to.equal(2)
+      expect(await creator.totalCreatedContract()).to.equal(3)
 
       let metadata = await creator.getMetadata(counterExAddr)
       expect(metadata.createdAddress).to.equal(counterExAddr)
@@ -180,9 +215,12 @@ describe('PermissionedContractFactory', function () {
 
       const bank = await ethers.getContractAt('Bank', bankExAddr)
       expect(await bank.balance()).to.equal(initialDeposit)
+
+      const pBank = await ethers.getContractAt('BankPersonal', pBankExAddr)
+      expect(await pBank.owner()).to.equal(newAdmin.address)
     })
 
-    it('Should revert if sent too much amout', async function () {
+    it('Should revert if sent too much amount', async function () {
       const { creator, creators } = await loadFixture(deployContractsFixture)
       const Bank = await ethers.getContractFactory('Bank')
       const initialDeposit = parseEther('42')
@@ -201,6 +239,7 @@ describe('PermissionedContractFactory', function () {
               bytecode: deplyTx.data,
               expected: expectedAddress1,
               tag: '',
+              owner: ZERO_ADDRESS,
             },
             {
               amount: initialDeposit,
@@ -208,6 +247,7 @@ describe('PermissionedContractFactory', function () {
               bytecode: deplyTx.data,
               expected: expectedAddress2,
               tag: '',
+              owner: ZERO_ADDRESS,
             },
           ],
           { value: initialDeposit * BigInt(3) },
@@ -234,6 +274,7 @@ describe('PermissionedContractFactory', function () {
               bytecode: deplyTx.data,
               expected: expectedAddress1,
               tag: '',
+              owner: ZERO_ADDRESS,
             },
             {
               amount: initialDeposit,
@@ -241,6 +282,7 @@ describe('PermissionedContractFactory', function () {
               bytecode: deplyTx.data,
               expected: expectedAddress2,
               tag: '',
+              owner: ZERO_ADDRESS,
             },
           ],
           { value: initialDeposit + parseEther('41') },

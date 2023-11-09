@@ -3,6 +3,8 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
+import {IContractMetadataRegistory} from "./interfaces/IContractMetadataRegistory.sol";
+import {IOwnable} from "./interfaces/IOwnable.sol";
 import {ContractMetadataRegistory} from "./ContractMetadataRegistory.sol";
 
 /**
@@ -27,7 +29,11 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         bytes bytecode;
         address expected;
         string tag;
+        address owner;
     }
+
+    /// @notice Semantic version.
+    string private constant _VERSION = "0.0.2";
 
     /*************
      * Variables *
@@ -45,7 +51,11 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
      */
     event ContractCreated(address creator, uint256 amount, bytes32 salt, bytes bytecode, address newContract);
 
-    constructor(address[] memory admins, address[] memory creators) {
+    constructor(
+        address[] memory admins,
+        address[] memory creators,
+        IContractMetadataRegistory _prevRegistory
+    ) ContractMetadataRegistory(_prevRegistory) {
         // set the default admin role as the admin role for the contract
         _setRoleAdmin(DEFAULT_ADMIN_ROLE, DEFAULT_ADMIN_ROLE);
 
@@ -65,6 +75,13 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         }
     }
 
+    /**
+     * @dev returns the semantic version.
+     */
+    function version() external pure returns (string memory) {
+        return _VERSION;
+    }
+
     // slither-disable-start locked-ether
 
     /**
@@ -74,6 +91,7 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
      * If the expected address does not match the newly created one, the execution will be reverted.
      *
      * @param tag Registerd as metadata, we intended to set it as a contract name. this can be empty string
+     * @param owner The owner of the contract. this is optional. if not zero, transfer ownership to this address
      *
      */
     function create(
@@ -81,10 +99,12 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         bytes32 salt,
         bytes memory bytecode,
         address expected,
-        string calldata tag
+        string calldata tag,
+        address owner
     ) external payable onlyRole(CONTRACT_CREATOR_ROLE) returns (address addr) {
         require(msg.value == amount, "PCC: incorrect amount sent");
-        return _create2(amount, salt, bytecode, expected, tag);
+        addr = _create2(amount, salt, bytecode, expected, tag);
+        _transferOwnershipFromThis(IOwnable(addr), owner);
     }
 
     /**
@@ -95,13 +115,14 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         for (uint256 i = 0; i < deployContracts.length; i++) {
             require(deployContracts[i].amount <= remaining, "PCC: insufficient amount sent");
             remaining -= deployContracts[i].amount;
-            _create2(
+            address addr = _create2(
                 deployContracts[i].amount,
                 deployContracts[i].salt,
                 deployContracts[i].bytecode,
                 deployContracts[i].expected,
                 deployContracts[i].tag
             );
+            _transferOwnershipFromThis(IOwnable(addr), deployContracts[i].owner);
         }
         // assert that the sum of sent amount is equal to the total amount of bulk creation
         require(remaining == 0, "PCC: too much amount sent");
@@ -138,5 +159,16 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
 
         // register the metadata of the created contract
         _registerMetadata(addr, msg.sender, tag);
+    }
+
+    /**
+     * @dev transfers the ownership to the designated address.
+     * to do so, the contract must be ownable and set the owner as msg.sender(=this contract)
+     */
+    function _transferOwnershipFromThis(IOwnable ownable, address newOwner) internal {
+        if (newOwner != address(0)) {
+            // assume the owner is this contract
+            ownable.transferOwnership(newOwner);
+        }
     }
 }

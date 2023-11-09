@@ -1,5 +1,7 @@
 # oasys-governance-contract
-Contracts governing the Oasys ecosystem: A gradual transition from centralized governance by the Oasys Core Team to decentralized governance by Council members
+Contracts governing the Oasys ecosystem: A gradual transition from centralized governance by the Oasys Core Team to decentralized governance by Council members.
+
+The Oasys Hub (L1) does not permit the deployment of contracts directly. We have imposed a restriction at the implementation level that prevents deployment from Externally Owned Accounts (EOAs), meaning no EOA is able to deploy contracts. Instead, we facilitate contract deployment through contract accounts using the `CREATE2` opcode. The Oasys Hub is intended to function as a public platform for game developers, and it was not designed to accommodate a vast array of contracts that are unrelated to gaming, such as those used in DeFi. This restriction is in place for that reason.
 
 
 ## The Initial Governance Contract (v0)
@@ -10,7 +12,7 @@ This is the first iteration of our governance contract. In this version, only wh
 
 ## Tasks
 ### Generate Deployment Bytecodes
-You can obtain deployment bytecodes by running the `gencode` task. Below is a sample command line to do this:
+Obtain deployment bytecodes by running the `gencode` task. Below is a sample command line to do this:
 ```sh
-npx hardhat gencode --admins 0x2ED22eA03fEA3e5BD90f6Fdd52C20c26ff6e1300,0x48466Bc93dF6563c2A638A4be20Feca46A1E314e --creators 0x48466Bc93dF6563c2A638A4be20Feca46A1E314e,0xBDDf8Fad2d30Cd4F7140244690b347fA873e082b
+npx hardhat gencode --admins 0x00..,0x00.. --creators 0x00..,0x00..
 ```
