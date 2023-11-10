@@ -24,12 +24,11 @@ import {ContractMetadataRegistory} from "./ContractMetadataRegistory.sol";
 contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory {
     // struct used for bulk contract creation
     struct DeployContract {
-        uint256 amount;
-        bytes32 salt;
+        uint256 amount; // Oasys don't funcd during deployment, so practicall this is 0
         bytes bytecode;
         address expected;
         string tag;
-        address owner;
+        bytes[] afterCalldatas;
     }
 
     /// @notice Semantic version.
@@ -91,21 +90,24 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
      * If the expected address does not match the newly created one, the execution will be reverted.
      *
      * @param tag Registerd as metadata, we intended to set it as a contract name. this can be empty string
-     * @param owner The owner of the contract. this is optional. if not zero, transfer ownership to this address
+     * @param afterCalldatas Calldata to be called after contract creation
      *
      */
     function create(
-        uint256 amount,
-        bytes32 salt,
-        bytes memory bytecode,
+        uint256 amount, // Oasys don't funcd during deployment, so practicall this is 0
+        bytes calldata bytecode,
         address expected,
         string calldata tag,
-        address owner
+        bytes[] calldata afterCalldatas
     ) external payable onlyRole(CONTRACT_CREATOR_ROLE) returns (address addr) {
         require(msg.value == amount, "PCC: incorrect amount sent");
-        addr = _create2(amount, salt, bytecode, expected, tag);
-        _transferOwnershipFromThis(IOwnable(addr), owner);
+        addr = _create2(amount, bytecode, expected, tag);
+        // call the deployed contract with the provided calldata
+        // intended to initialize the contract or transfer ownership
+        _call(addr, afterCalldatas);
     }
+
+    // slither-disable-start reentrancy-no-eth
 
     /**
      * @dev creates multiple contracts using the `CREATE2` opcode.
@@ -117,36 +119,45 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
             remaining -= deployContracts[i].amount;
             address addr = _create2(
                 deployContracts[i].amount,
-                deployContracts[i].salt,
                 deployContracts[i].bytecode,
                 deployContracts[i].expected,
                 deployContracts[i].tag
             );
-            _transferOwnershipFromThis(IOwnable(addr), deployContracts[i].owner);
+            _call(addr, deployContracts[i].afterCalldatas);
         }
         // assert that the sum of sent amount is equal to the total amount of bulk creation
         require(remaining == 0, "PCC: too much amount sent");
     }
 
+    // slither-disable-end reentrancy-no-eth
     // slither-disable-end locked-ether
 
     /**
      * @dev computes the address of a contract that would be created using the `CREATE2` opcode.
-     * The address is computed using the provided salt and bytecode.
      */
-    function getDeploymentAddress(bytes32 salt, bytes memory bytecode) external view returns (address addr) {
-        addr = Create2.computeAddress(salt, keccak256(bytecode), address(this));
+    function getDeploymentAddress(bytes calldata bytecode) external view returns (address addr) {
+        addr = Create2.computeAddress(_generateSalt(bytecode), keccak256(bytecode), address(this));
+    }
+
+    function _generateSalt(bytes memory bytecode) internal pure returns (bytes32 salt) {
+        // use the first 32 bytes of bytecode as the salt
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            let pointer := add(bytecode, 0x20)
+            salt := mload(pointer)
+        }
     }
 
     function _create2(
         uint256 amount,
-        bytes32 salt,
-        bytes memory bytecode,
+        bytes calldata bytecode,
         address expected,
         string calldata tag
     ) internal returns (address addr) {
         // NOTE: Enables pre-funding of the address.
         // require(expected.balance == 0, "PCC: expected is not empty");
+
+        bytes32 salt = _generateSalt(bytecode);
 
         // create the contract using the provided bytecode and salt
         // NOTE: in case of duplicate creation, the transaction will be reverted
@@ -161,14 +172,11 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
         _registerMetadata(addr, msg.sender, tag);
     }
 
-    /**
-     * @dev transfers the ownership to the designated address.
-     * to do so, the contract must be ownable and set the owner as msg.sender(=this contract)
-     */
-    function _transferOwnershipFromThis(IOwnable ownable, address newOwner) internal {
-        if (newOwner != address(0)) {
-            // assume the owner is this contract
-            ownable.transferOwnership(newOwner);
+    function _call(address addr, bytes[] calldata datas) internal {
+        for (uint256 i = 0; i < datas.length; i++) {
+            // solhint-disable-next-line avoid-low-level-calls
+            (bool success, ) = addr.call(datas[i]);
+            require(success, "PCC: after call failed");
         }
     }
 }

@@ -5,9 +5,17 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract BankPersonal is Ownable {
     uint256 public balance;
+    string public name;
+    bool public initialized = false;
 
     constructor() payable {
         balance = msg.value;
+    }
+
+    function initalize(string memory _name) public onlyOwner {
+        require(!initialized, "already initialized");
+        initialized = true;
+        name = _name;
     }
 
     function deposit() public payable onlyOwner {
