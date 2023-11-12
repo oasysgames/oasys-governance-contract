@@ -8,12 +8,14 @@ contract BankPersonal is Ownable {
     string public name;
     bool public initialized = false;
 
+    error AlreadyInitalized();
+
     constructor() payable {
         balance = msg.value;
     }
 
     function initalize(string memory _name) public onlyOwner {
-        require(!initialized, "already initialized");
+        if (initialized) revert AlreadyInitalized();
         initialized = true;
         name = _name;
     }

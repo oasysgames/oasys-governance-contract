@@ -25,6 +25,7 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
     // struct used for bulk contract creation
     struct DeployContract {
         uint256 amount; // Oasys don't funcd during deployment, so practicall this is 0
+        bytes32 salt;
         bytes bytecode;
         address expected;
         string tag;
@@ -89,19 +90,21 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
      * The caller must send the expected new contract address for deployment.
      * If the expected address does not match the newly created one, the execution will be reverted.
      *
+     * @param salt Optional, if not supplied, compute from bytecode
      * @param tag Registerd as metadata, we intended to set it as a contract name. this can be empty string
      * @param afterCalldatas Calldata to be called after contract creation
      *
      */
     function create(
         uint256 amount, // Oasys don't funcd during deployment, so practicall this is 0
+        bytes32 salt,
         bytes calldata bytecode,
         address expected,
         string calldata tag,
         bytes[] calldata afterCalldatas
     ) external payable onlyRole(CONTRACT_CREATOR_ROLE) returns (address addr) {
         require(msg.value == amount, "PCC: incorrect amount sent");
-        addr = _create2(amount, bytecode, expected, tag);
+        addr = _create2(amount, _salt(bytecode, salt), bytecode, expected, tag);
         // call the deployed contract with the provided calldata
         // intended to initialize the contract or transfer ownership
         _call(addr, afterCalldatas);
@@ -110,15 +113,19 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
     // slither-disable-start reentrancy-no-eth
 
     /**
-     * @dev creates multiple contracts using the `CREATE2` opcode.
+     * @dev creates multiple contracts using the `CREATE2` opcode
      */
     function bulkCreate(DeployContract[] calldata deployContracts) external payable onlyRole(CONTRACT_CREATOR_ROLE) {
         uint256 remaining = msg.value;
         for (uint256 i = 0; i < deployContracts.length; i++) {
             require(deployContracts[i].amount <= remaining, "PCC: insufficient amount sent");
+
+            // sub required amout
             remaining -= deployContracts[i].amount;
+
             address addr = _create2(
                 deployContracts[i].amount,
+                _salt(deployContracts[i].bytecode, deployContracts[i].salt),
                 deployContracts[i].bytecode,
                 deployContracts[i].expected,
                 deployContracts[i].tag
@@ -134,9 +141,15 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
 
     /**
      * @dev computes the address of a contract that would be created using the `CREATE2` opcode.
+     *
+     * @param salt Optional, if not supplied, compute from bytecode
      */
-    function getDeploymentAddress(bytes calldata bytecode) external view returns (address addr) {
-        addr = Create2.computeAddress(_generateSalt(bytecode), keccak256(bytecode), address(this));
+    function getDeploymentAddress(bytes calldata bytecode, bytes32 salt) external view returns (address addr) {
+        addr = Create2.computeAddress(_salt(bytecode, salt), keccak256(bytecode), address(this));
+    }
+
+    function _salt(bytes calldata bytecode, bytes32 salt) internal pure returns (bytes32) {
+        return salt != bytes32(0) ? salt : _generateSalt(bytecode);
     }
 
     function _generateSalt(bytes memory bytecode) internal pure returns (bytes32 salt) {
@@ -150,14 +163,13 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
 
     function _create2(
         uint256 amount,
+        bytes32 salt,
         bytes calldata bytecode,
         address expected,
         string calldata tag
     ) internal returns (address addr) {
         // NOTE: Enables pre-funding of the address.
         // require(expected.balance == 0, "PCC: expected is not empty");
-
-        bytes32 salt = _generateSalt(bytecode);
 
         // create the contract using the provided bytecode and salt
         // NOTE: in case of duplicate creation, the transaction will be reverted
@@ -175,8 +187,19 @@ contract PermissionedContractFactory is AccessControl, ContractMetadataRegistory
     function _call(address addr, bytes[] calldata datas) internal {
         for (uint256 i = 0; i < datas.length; i++) {
             // solhint-disable-next-line avoid-low-level-calls
-            (bool success, ) = addr.call(datas[i]);
-            require(success, "PCC: after call failed");
+            (bool success, bytes memory returndata) = addr.call(datas[i]);
+
+            if (!success) {
+                if (returndata.length > 0) {
+                    // solhint-disable-next-line no-inline-assembly
+                    assembly {
+                        let returndata_size := mload(returndata)
+                        revert(add(32, returndata), returndata_size)
+                    }
+                } else {
+                    revert("PCC: after call failed");
+                }
+            }
         }
     }
 }
