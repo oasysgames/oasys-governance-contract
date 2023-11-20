@@ -5,6 +5,7 @@
     "func-param-name-mixedcase": "error",
     "modifier-name-mixedcase": "error",
     "private-vars-leading-underscore": "error",
-    "func-visibility": ["warn",{"ignoreConstructors":true}]
+    "func-visibility": ["warn",{"ignoreConstructors":true}],
+    "reason-string": ["warn",{"maxLength":40}]
   }
 }
