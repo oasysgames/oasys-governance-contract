@@ -142,3 +142,5 @@ typechain-types
 
 # Project Specific
 /artifacts/@openzeppelin
+.arguments.js
+note.md

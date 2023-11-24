@@ -20,6 +20,24 @@ const config: HardhatUserConfig = {
       initialBaseFeePerGas: 0,
       gasPrice: 0,
     },
+    oasysmainnet: {
+      url: "https://rpc.mainnet.oasys.games",
+    },
+  },
+  etherscan: {
+    apiKey: {
+      oasysmainnet: "abc"
+    },
+    customChains: [
+      {
+        network: "oasysmainnet",
+        chainId: 248,
+        urls: {
+          apiURL: "https://explorer.oasys.games/api",
+          browserURL: "https://explorer.oasys.games/"
+        }
+      }
+    ]
   },
   mocha: {
     timeout: 1000 * 60 * 3, // 3 minutes
