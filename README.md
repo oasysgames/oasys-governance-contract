@@ -23,3 +23,15 @@ By executing the `get-address.sh` script, you can retrieve the address where the
 ```sh
 CALLDATA=0x60..00 ./scripts/get-address.sh
 ```
+
+### Generate Sample Contracts Bytecodes
+```sh
+# simple counter contract
+npx hardhat sample-counter
+
+# ownable bank contract
+npx hardhat sample-bank
+
+# upgradable counter contract
+npx hardhat sample-counter-upgradable
+```

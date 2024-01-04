@@ -3,7 +3,7 @@ pragma solidity ^0.8.17;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract BankPersonal is Ownable {
+contract BankOwnable is Ownable {
     uint256 public balance;
     string public name;
     bool public initialized = false;
