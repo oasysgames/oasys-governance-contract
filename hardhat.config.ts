@@ -4,6 +4,11 @@ import "@nomicfoundation/hardhat-toolbox";
 
 import "./tasks/gen-deploycode";
 
+// samples
+import "./tasks/samples/counter";
+import "./tasks/samples/bank";
+import "./tasks/samples/counter-upgradable";
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.19",

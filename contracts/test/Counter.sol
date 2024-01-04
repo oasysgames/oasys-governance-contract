@@ -8,6 +8,10 @@ contract Counter {
         count = _count;
     }
 
+    function inialize(uint _count) public {
+        count = _count;
+    }
+
     // Function to get the current count
     function get() public view returns (uint) {
         return count;

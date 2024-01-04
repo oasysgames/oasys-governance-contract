@@ -66,13 +66,13 @@ describe('PermissionedContractFactory', function () {
 
     it('Should succeed to fund inital amount/transfer admin ship', async function () {
       const { creator, creators, newAdmin } = await loadFixture(deployContractsFixture)
-      const Bank = await ethers.getContractFactory('BankPersonal')
+      const Bank = await ethers.getContractFactory('BankOwnable')
       const initialDeposit = parseEther('42')
       const deplyTx = await Bank.getDeployTransaction()
       const salt = generateSalt()
 
       const expectedAddress = await creator.getDeploymentAddress(deplyTx.data, salt)
-      const bank = await ethers.getContractAt('BankPersonal', expectedAddress)
+      const bank = await ethers.getContractAt('BankOwnable', expectedAddress)
       const name = 'personal bank'
       const call1 = await bank.getFunction('initalize').populateTransaction(name)
       const call2 = await bank.getFunction('transferOwnership').populateTransaction(newAdmin.address)
@@ -139,11 +139,11 @@ describe('PermissionedContractFactory', function () {
 
     it('Should revert if afater call failed: revert with string reason', async function () {
       const { creator, creators, newAdmin } = await loadFixture(deployContractsFixture)
-      const Bank = await ethers.getContractFactory('BankPersonal')
+      const Bank = await ethers.getContractFactory('BankOwnable')
       const initialDeposit = parseEther('42')
       const deplyTx = await Bank.getDeployTransaction()
       const expectedAddress = await creator.getDeploymentAddress(deplyTx.data, ZERO_BYTE32)
-      const bank = await ethers.getContractAt('BankPersonal', expectedAddress)
+      const bank = await ethers.getContractAt('BankOwnable', expectedAddress)
       const name = 'personal bank'
       const call1 = await bank.getFunction('initalize').populateTransaction(name)
       const call2 = await bank.getFunction('transferOwnership').populateTransaction(newAdmin.address)
@@ -159,11 +159,11 @@ describe('PermissionedContractFactory', function () {
 
     it('Should revert if afater call failed: revert with custom error', async function () {
       const { creator, creators, newAdmin } = await loadFixture(deployContractsFixture)
-      const Bank = await ethers.getContractFactory('BankPersonal')
+      const Bank = await ethers.getContractFactory('BankOwnable')
       const initialDeposit = parseEther('42')
       const deplyTx = await Bank.getDeployTransaction()
       const expectedAddress = await creator.getDeploymentAddress(deplyTx.data, ZERO_BYTE32)
-      const bank = await ethers.getContractAt('BankPersonal', expectedAddress)
+      const bank = await ethers.getContractAt('BankOwnable', expectedAddress)
       const name = 'personal bank'
       const call1 = await bank.getFunction('initalize').populateTransaction(name)
 
@@ -192,11 +192,11 @@ describe('PermissionedContractFactory', function () {
       const bankTag = 'Bank'
       const bankExAddr = await creator.getDeploymentAddress(bankDeplyTx.data, ZERO_BYTE32)
 
-      const BankPersonal = await ethers.getContractFactory('BankPersonal')
-      const pBankDeplyTx = await BankPersonal.getDeployTransaction()
-      const pBankTag = 'BankPersonal'
+      const BankOwnable = await ethers.getContractFactory('BankOwnable')
+      const pBankDeplyTx = await BankOwnable.getDeployTransaction()
+      const pBankTag = 'BankOwnable'
       const pBankExAddr = await creator.getDeploymentAddress(pBankDeplyTx.data, ZERO_BYTE32)
-      const pBank = await ethers.getContractAt('BankPersonal', pBankExAddr)
+      const pBank = await ethers.getContractAt('BankOwnable', pBankExAddr)
       const call = await pBank.getFunction('transferOwnership').populateTransaction(newAdmin.address)
 
       await creator.connect(creators[0]).bulkCreate(
@@ -256,7 +256,7 @@ describe('PermissionedContractFactory', function () {
       const deplyTx1 = await Bank.getDeployTransaction()
       const expectedAddress1 = await creator.getDeploymentAddress(deplyTx1.data, ZERO_BYTE32)
 
-      const pBank = await ethers.getContractFactory('BankPersonal')
+      const pBank = await ethers.getContractFactory('BankOwnable')
       const deplyTx2 = await pBank.getDeployTransaction()
       const expectedAddress2 = await creator.getDeploymentAddress(deplyTx2.data, ZERO_BYTE32)
       await expect(
@@ -389,9 +389,9 @@ describe('PermissionedContractFactory', function () {
       const bankTag = 'Bank'
       const bankExAddr = await creator.getDeploymentAddress(bankDeplyTx.data, ZERO_BYTE32)
 
-      const BankPersonal = await ethers.getContractFactory('BankPersonal')
-      const pBankDeplyTx = await BankPersonal.getDeployTransaction()
-      const pBankTag = 'BankPersonal'
+      const BankOwnable = await ethers.getContractFactory('BankOwnable')
+      const pBankDeplyTx = await BankOwnable.getDeployTransaction()
+      const pBankTag = 'BankOwnable'
       const pBankExAddr = await creatorV2.getDeploymentAddress(pBankDeplyTx.data, ZERO_BYTE32)
 
       await creator.connect(creators[0]).bulkCreate(
