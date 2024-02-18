@@ -44,7 +44,7 @@ task('bulkcreate', 'Call bulk create function of PermissionedContractFactory')
 
     if (taskArgs.simulate) {
       await simulate(factory, rows)
-      console.log("\nwill successful!")
+      console.log('\nwill successful!')
     }
 
     if (taskArgs.execute) {
@@ -52,15 +52,8 @@ task('bulkcreate', 'Call bulk create function of PermissionedContractFactory')
     }
   })
 
-const convertToTuples = (objects:any): any => {
-  return objects.map((obj: any) => [
-    obj.amount,
-    obj.salt,
-    obj.bytecode,
-    obj.expected,
-    obj.tag,
-    obj.afterCalldatas
-  ]);
+const convertToTuples = (objects: any): any => {
+  return objects.map((obj: any) => [obj.amount, obj.salt, obj.bytecode, obj.expected, obj.tag, obj.afterCalldatas])
 }
 
 const simulate = async (factory: Contracts.PermissionedContractFactory, rows: any): Promise<void> => {
@@ -82,8 +75,8 @@ const simulate = async (factory: Contracts.PermissionedContractFactory, rows: an
 
 const execute = async (factory: Contracts.PermissionedContractFactory, rows: any, sender: string): Promise<void> => {
   try {
-    const tx = await factory.bulkCreate(rows, {from: sender})
-    const receipt = await tx.wait();
+    const tx = await factory.bulkCreate(rows, { from: sender })
+    const receipt = await tx.wait()
     console.log(`succeed to deploy: ${receipt?.hash}`)
   } catch (err: any) {
     if (err.message.includes('too many contracts')) {

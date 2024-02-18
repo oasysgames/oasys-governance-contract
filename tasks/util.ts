@@ -40,10 +40,10 @@ export function readCSV(filePath: string) {
 }
 
 export function writeJsonToFile(jsonObj: any, filePath: string) {
-  const jsonString = JSON.stringify(jsonObj, null);
+  const jsonString = JSON.stringify(jsonObj, null)
 
   // ファイルに書き込む
-  fs.writeFileSync(filePath, jsonString, 'utf8');
+  fs.writeFileSync(filePath, jsonString, 'utf8')
 }
 
 export function splitArray<T>(array: T[]): [T[], T[]] {
