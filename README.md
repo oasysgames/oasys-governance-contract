@@ -19,7 +19,7 @@ npx hardhat gencode --admins 0x00..,0x00.. --creators 0x00..,0x00.. --prev 0x00.
 
 ## Scripts
 ### Retrieving the Deployment Address
-By executing the `get-address.sh` script, you can retrieve the address where the deployment will occur by providing the deployment calldata.
+By executing the [get-address.sh](/scripts/get-address.sh) script, you can retrieve the address where the deployment will occur by providing the deployment calldata.
 ```sh
 CALLDATA=0x60..00 ./scripts/get-address.sh
 ```
