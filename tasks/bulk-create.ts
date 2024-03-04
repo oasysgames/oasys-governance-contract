@@ -79,14 +79,16 @@ const execute = async (factory: Contracts.PermissionedContractFactory, rows: any
     const receipt = await tx.wait()
     console.log(`succeed to deploy: ${receipt?.hash}`)
   } catch (err: any) {
-    if (err.message.includes('too many contracts')) {
+    if (err.message.includes('too many contracts') || err.message.includes('transaction underpriced')) {
+      // Too many contracts
       if (rows.length === 1) {
-        throw new Error('failed even single call')
+        throw new Error(`failed even single call. address:${rows[0].expected}  err: ${err.message}`)
       }
       const [firstHalf, secondHalf] = splitArray(rows)
       await execute(factory, firstHalf, sender)
       await execute(factory, secondHalf, sender)
     } else {
+      // Other errors
       throw new Error(`failed: ${err.message}`)
     }
   }
