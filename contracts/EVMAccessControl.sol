@@ -32,6 +32,18 @@ contract EVMAccessControl is AccessControl {
      */
     mapping(address => bool) private _callDeniedList;
 
+    /**
+     * @dev list of addresses allowed to execute create
+     * This order is not guaranteed to be the same as the order in which the addresses were added.
+     */
+    address[] private _createAllowedListKeys;
+
+    /**
+     * @dev list of addresses denied from calling
+     * This order is not guaranteed to be the same as the order in which the addresses were added.
+     */
+    address[] private _callDeniedListKeys;
+
     /**********
      * Events *
      **********/
@@ -54,13 +66,11 @@ contract EVMAccessControl is AccessControl {
      * @param managers The addresses to be granted the `MANAGER_ROLE`.
      */
     constructor(address[] memory admins, address[] memory managers) {
-        // NOTE: overflow if admins.length >= 255(=max uint8 + 1)
-        // indirectly asserting the length of arrays is less than 255
-        for (uint8 i = 0; i < admins.length; i++) {
+        for (uint256 i = 0; i < admins.length; ++i) {
             require(admins[i] != address(0), "EAC: admin is zero");
             _setupRole(DEFAULT_ADMIN_ROLE, admins[i]);
         }
-        for (uint8 i = 0; i < managers.length; i++) {
+        for (uint256 i = 0; i < managers.length; ++i) {
             require(managers[i] != address(0), "EAC: creator is zero");
             _setupRole(MANAGER_ROLE, managers[i]);
         }
@@ -81,7 +91,9 @@ contract EVMAccessControl is AccessControl {
     function addCreateAllowedList(address _addr) external onlyRole(MANAGER_ROLE) {
         require(_addr != address(0), "EAC: addr is zero");
         require(!_createAllowedList[_addr], "EAC: already allowed");
+
         _createAllowedList[_addr] = true;
+        _addAddressToArray(_createAllowedListKeys, _addr);
         emit CreateAllowed(_addr);
     }
 
@@ -93,7 +105,9 @@ contract EVMAccessControl is AccessControl {
     function removeCreateAllowedList(address _addr) external onlyRole(MANAGER_ROLE) {
         require(_addr != address(0), "EAC: addr is zero");
         require(_createAllowedList[_addr], "EAC: not allowed");
+
         delete _createAllowedList[_addr];
+        _removeAddressFromArray(_createAllowedListKeys, _addr);
         emit CreateDenied(_addr);
     }
 
@@ -105,7 +119,9 @@ contract EVMAccessControl is AccessControl {
     function addCallDeniedList(address _addr) external onlyRole(MANAGER_ROLE) {
         require(_addr != address(0), "EAC: addr is zero");
         require(!_callDeniedList[_addr], "EAC: already denied");
+
         _callDeniedList[_addr] = true;
+        _addAddressToArray(_callDeniedListKeys, _addr);
         emit CallDenied(_addr);
     }
 
@@ -117,7 +133,9 @@ contract EVMAccessControl is AccessControl {
     function removeCallDeniedList(address _addr) external onlyRole(MANAGER_ROLE) {
         require(_addr != address(0), "EAC: addr is zero");
         require(_callDeniedList[_addr], "EAC: not denied");
+
         delete _callDeniedList[_addr];
+        _removeAddressFromArray(_callDeniedListKeys, _addr);
         emit CallAllowed(_addr);
     }
 
@@ -137,5 +155,87 @@ contract EVMAccessControl is AccessControl {
      */
     function isDeniedToCall(address _addr) external view returns (bool) {
         return _callDeniedList[_addr];
+    }
+
+    /**
+     * @dev Returns the list of addresses allowed to execute create.
+     * Empty addresses means the slot is empty.
+     * @return list of addresses allowed to execute create.
+     */
+    function listCreateAllowed() external view returns (address[] memory) {
+        return _listSkippingEmpty(_createAllowedListKeys);
+    }
+
+    /**
+     * @dev Returns the list of addresses denied from calling.
+     * Empty addresses means the slot is empty.
+     * @return list of addresses denied from calling.
+     */
+    function listCallDenied() external view returns (address[] memory) {
+        return _listSkippingEmpty(_callDeniedListKeys);
+    }
+
+    /**
+     * @dev Internal function to add an address to the array.
+     * @param array The array to add the address.
+     * @param _addr The address to be added.
+     */
+    function _addAddressToArray(address[] storage array, address _addr) private {
+        // find empty index
+        (bool found, uint256 index) = _findFirstIndex(array, address(0));
+        if (found) {
+            array[index] = _addr;
+        } else {
+            array.push(_addr);
+        }
+    }
+
+    /**
+     * @dev Internal function to remove an address from the array.
+     * @param array The array to remove the address.
+     * @param _addr The address to be removed.
+     */
+    function _removeAddressFromArray(address[] storage array, address _addr) private {
+        // find the index of the address
+        (bool found, uint256 index) = _findFirstIndex(array, _addr);
+        if (found) {
+            // set the address to zero
+            array[index] = address(0);
+        } else {
+            revert("EAC: index not found");
+        }
+    }
+
+    /**
+     * @dev Internal function to find the first index of the address in the array.
+     * @param array The array to find the address.
+     * @param _addr The address to find.
+     * @return bool indicating if the address is found, uint256 index of the address.
+     */
+    function _findFirstIndex(address[] storage array, address _addr) private view returns (bool, uint256) {
+        for (uint256 i = 0; i < array.length; ++i) {
+            if (array[i] == _addr) {
+                return (true, i);
+            }
+        }
+        return (false, type(uint256).max);
+    }
+
+    /**
+     * @dev Internal function to list the addresses in the array skipping empty addresses.
+     * @param array The array to list the addresses.
+     * @return list of addresses.
+     */
+    function _listSkippingEmpty(address[] storage array) private view returns (address[] memory) {
+        address[] memory list = new address[](array.length);
+        uint256 listIndex = 0;
+        for (uint256 i = 0; i < array.length; ++i) {
+            if (array[i] == address(0)) {
+                continue;
+            }
+            list[listIndex] = array[i];
+            ++listIndex;
+        }
+        return list;
     }
 }

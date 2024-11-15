@@ -2,7 +2,9 @@ import { loadFixture } from '@nomicfoundation/hardhat-toolbox/network-helpers'
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers'
+import exp from 'constants'
 
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const leftPadAddressToBytes32 = (address: string) => {
   const cleanAddress = address.toLowerCase().replace(/^0x/, '')
   const paddedAddress = '0'.repeat(64 - cleanAddress.length) + cleanAddress
@@ -12,16 +14,30 @@ const leftPadAddressToBytes32 = (address: string) => {
 describe('EVMAccessControl', function () {
   async function deployContractsFixture() {
     // admins and managers
-    const [admin, manager1, manager2, newAdmin, newManager, creator, caller, attacker] = await ethers.getSigners()
+    const [admin, manager1, manager2, newAdmin, newManager, creator, caller, signer1, signer2, signer3, attacker] =
+      await ethers.getSigners()
     const admins: HardhatEthersSigner[] = [admin]
     const managers: HardhatEthersSigner[] = [manager1, manager2]
+    const addresses: string[] = [signer1.address, signer2.address, signer3.address]
     // deploy
     const Controller = await ethers.getContractFactory('ExtendEVMAccessControl')
     const controller = await Controller.deploy([admin.address], [manager1.address, manager2.address])
     // roles
     const adminRole = await controller.DEFAULT_ADMIN_ROLE()
     const managerRole = await controller.MANAGER_ROLE()
-    return { controller, admins, managers, newAdmin, newManager, creator, caller, attacker, adminRole, managerRole }
+    return {
+      controller,
+      admins,
+      managers,
+      newAdmin,
+      newManager,
+      creator,
+      caller,
+      addresses,
+      attacker,
+      adminRole,
+      managerRole,
+    }
   }
 
   describe('Deployment', function () {
@@ -137,6 +153,38 @@ describe('EVMAccessControl', function () {
       await expect(controller.connect(managers[0]).removeCallDeniedList(caller.address)).to.be.revertedWith(
         'EAC: not denied',
       )
+    })
+  })
+
+  describe('listCreateAllowed/listCallDenied', function () {
+    it('succeed', async function () {
+      const { controller, managers, addresses } = await loadFixture(deployContractsFixture)
+
+      // Add two addresses to allowed list
+      await controller.connect(managers[0]).addCreateAllowedList(addresses[0])
+      await controller.connect(managers[0]).addCreateAllowedList(addresses[1])
+      await controller.connect(managers[0]).addCallDeniedList(addresses[0])
+      await controller.connect(managers[0]).addCallDeniedList(addresses[1])
+      expect(await controller.listCreateAllowed()).to.deep.equal(addresses.slice(0, 2))
+      expect(await controller.listCallDenied()).to.deep.equal(addresses.slice(0, 2))
+
+      // Add last address to allowed list
+      await controller.connect(managers[0]).addCreateAllowedList(addresses[2])
+      await controller.connect(managers[0]).addCallDeniedList(addresses[2])
+      expect(await controller.listCreateAllowed()).to.deep.equal(addresses)
+      expect(await controller.listCallDenied()).to.deep.equal(addresses)
+
+      // Remove the middle address from allowed list
+      await controller.connect(managers[0]).removeCreateAllowedList(addresses[1])
+      await controller.connect(managers[0]).removeCallDeniedList(addresses[1])
+      expect(await controller.listCreateAllowed()).to.deep.equal([addresses[0], addresses[2], ZERO_ADDRESS])
+      expect(await controller.listCallDenied()).to.deep.equal([addresses[0], addresses[2], ZERO_ADDRESS])
+
+      // Add back the middle address to allowed list
+      await controller.connect(managers[0]).addCreateAllowedList(addresses[1])
+      await controller.connect(managers[0]).addCallDeniedList(addresses[1])
+      expect(await controller.listCreateAllowed()).to.deep.equal(addresses)
+      expect(await controller.listCallDenied()).to.deep.equal(addresses)
     })
   })
 
