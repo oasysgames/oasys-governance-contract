@@ -15,7 +15,7 @@ contract EVMAccessControl is AccessControl {
      *************/
 
     /// @notice Semantic version.
-    string private constant _VERSION = "0.0.1";
+    string private constant _VERSION = "1.0.0";
 
     /// @dev keccak256 hash of "CREATOR_ROLE" is the role identifier
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");

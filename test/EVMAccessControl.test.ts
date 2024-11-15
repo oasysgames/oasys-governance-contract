@@ -50,7 +50,7 @@ describe('EVMAccessControl', function () {
       for (const _creator of managers) {
         expect(await controller.hasRole(managerRole, _creator)).to.be.true
       }
-      expect(await controller.version()).to.equal('0.0.1')
+      expect(await controller.version()).to.equal('1.0.0')
     })
   })
 
