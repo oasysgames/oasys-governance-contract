@@ -24,6 +24,11 @@ By executing the [get-address.sh](/scripts/get-address.sh) script, you can retri
 CALLDATA=0x60..00 ./scripts/get-address.sh
 ```
 
+### BulkCreate
+```sh
+npx hardhat bulkcreate --network oasystestnet --factory 0x123e3ae459a8D049F27Ba62B8a5D48c68A100EBC --csv ./csv/sample.csv --simulate --execute --output ./output/sample.json
+```
+
 ### Generate Sample Contracts Bytecodes
 ```sh
 # simple counter contract
