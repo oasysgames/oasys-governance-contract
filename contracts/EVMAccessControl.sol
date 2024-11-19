@@ -20,7 +20,11 @@ contract EVMAccessControl is AccessControl {
     /// @dev keccak256 hash of "CREATOR_ROLE" is the role identifier
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    /// @dev SENTINEL is used in linked list traversal to mark the start and end.
+    /**
+     * @dev SENTINEL is used in linked list traversal to mark the start and end.
+     * Apply the `Sentinel Pattern` to internal maps to make them iterable.
+     * Reference: https://andrej.hashnode.dev/sentinel-pattern
+     */
     address public constant SENTINEL = address(0x1);
 
     /**
