@@ -20,29 +20,20 @@ contract EVMAccessControl is AccessControl {
     /// @dev keccak256 hash of "CREATOR_ROLE" is the role identifier
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
+    /// @dev SENTINEL is used in linked list traversal to mark the start and end.
+    address public constant SENTINEL = address(0x1);
+
     /**
-     * @dev list of addresses allowed to execute create
+     * @dev linked list of addresses allowed to execute create
      * Never change the slot of this variable, as this value is directly accessed by storage key.
      */
-    mapping(address => bool) private _createAllowedList;
+    mapping(address => address) private _createAllowedList;
 
     /**
-     * @dev list of addresses denied from calling
+     * @dev linked list of addresses denied from calling
      * Never change the slot of this variable, as this value is directly accessed by storage key.
      */
-    mapping(address => bool) private _callDeniedList;
-
-    /**
-     * @dev list of addresses allowed to execute create
-     * This order is not guaranteed to be the same as the order in which the addresses were added.
-     */
-    address[] private _createAllowedListKeys;
-
-    /**
-     * @dev list of addresses denied from calling
-     * This order is not guaranteed to be the same as the order in which the addresses were added.
-     */
-    address[] private _callDeniedListKeys;
+    mapping(address => address) private _callDeniedList;
 
     /**********
      * Events *
@@ -74,6 +65,10 @@ contract EVMAccessControl is AccessControl {
             require(managers[i] != address(0), "EAC: creator is zero");
             _setupRole(MANAGER_ROLE, managers[i]);
         }
+
+        // Initialize the sentinel node of the linked list.
+        _createAllowedList[SENTINEL] = SENTINEL;
+        _callDeniedList[SENTINEL] = SENTINEL;
     }
 
     /**
@@ -89,11 +84,7 @@ contract EVMAccessControl is AccessControl {
      * @param _addr The address to be added to the allowed create list.
      */
     function addCreateAllowedList(address _addr) external onlyRole(MANAGER_ROLE) {
-        require(_addr != address(0), "EAC: addr is zero");
-        require(!_createAllowedList[_addr], "EAC: already allowed");
-
-        _createAllowedList[_addr] = true;
-        _addAddressToArray(_createAllowedListKeys, _addr);
+        _add(_createAllowedList, _addr);
         emit CreateAllowed(_addr);
     }
 
@@ -101,13 +92,11 @@ contract EVMAccessControl is AccessControl {
      * @dev Removes `_addr` from the allowed create list.
      * Can only be called by an account with `MANAGER_ROLE`.
      * @param _addr The address to be removed from the allowed create list.
+     * @param _prev The previous address in the linked list.
+     *              If unspecified, traversing the linked list may cause an out-of-gas error.
      */
-    function removeCreateAllowedList(address _addr) external onlyRole(MANAGER_ROLE) {
-        require(_addr != address(0), "EAC: addr is zero");
-        require(_createAllowedList[_addr], "EAC: not allowed");
-
-        delete _createAllowedList[_addr];
-        _removeAddressFromArray(_createAllowedListKeys, _addr);
+    function removeCreateAllowedList(address _addr, address _prev) external onlyRole(MANAGER_ROLE) {
+        _remove(_createAllowedList, _addr, _prev);
         emit CreateDenied(_addr);
     }
 
@@ -117,11 +106,7 @@ contract EVMAccessControl is AccessControl {
      * @param _addr The address to be added to the denied call list.
      */
     function addCallDeniedList(address _addr) external onlyRole(MANAGER_ROLE) {
-        require(_addr != address(0), "EAC: addr is zero");
-        require(!_callDeniedList[_addr], "EAC: already denied");
-
-        _callDeniedList[_addr] = true;
-        _addAddressToArray(_callDeniedListKeys, _addr);
+        _add(_callDeniedList, _addr);
         emit CallDenied(_addr);
     }
 
@@ -129,13 +114,11 @@ contract EVMAccessControl is AccessControl {
      * @dev Removes `_addr` from the denied call list.
      * Can only be called by an account with `MANAGER_ROLE`.
      * @param _addr The address to be removed from the denied call list.
+     * @param _prev The previous address in the linked list.
+     *              If unspecified, traversing the linked list may cause an out-of-gas error.
      */
-    function removeCallDeniedList(address _addr) external onlyRole(MANAGER_ROLE) {
-        require(_addr != address(0), "EAC: addr is zero");
-        require(_callDeniedList[_addr], "EAC: not denied");
-
-        delete _callDeniedList[_addr];
-        _removeAddressFromArray(_callDeniedListKeys, _addr);
+    function removeCallDeniedList(address _addr, address _prev) external onlyRole(MANAGER_ROLE) {
+        _remove(_callDeniedList, _addr, _prev);
         emit CallAllowed(_addr);
     }
 
@@ -145,7 +128,7 @@ contract EVMAccessControl is AccessControl {
      * @return bool indicating if the address is allowed to create.
      */
     function isAllowedToCreate(address _addr) external view returns (bool) {
-        return _createAllowedList[_addr];
+        return _contains(_createAllowedList, _addr);
     }
 
     /**
@@ -154,88 +137,119 @@ contract EVMAccessControl is AccessControl {
      * @return bool indicating if the address is denied.
      */
     function isDeniedToCall(address _addr) external view returns (bool) {
-        return _callDeniedList[_addr];
+        return _contains(_callDeniedList, _addr);
     }
 
     /**
      * @dev Returns the list of addresses allowed to execute create.
-     * Empty addresses means the slot is empty.
+     * @param _cursor The starting address in the linked list.
+     *                If unspecified, starts from the top of the linked list
+     * @param _howMany The maximum number of addresses to retrieve.
      * @return list of addresses allowed to execute create.
      */
-    function listCreateAllowed() external view returns (address[] memory) {
-        return _listSkippingEmpty(_createAllowedListKeys);
+    function listCreateAllowed(address _cursor, uint256 _howMany) external view returns (address[] memory) {
+        return _paginate(_createAllowedList, _cursor, _howMany);
     }
 
     /**
      * @dev Returns the list of addresses denied from calling.
-     * Empty addresses means the slot is empty.
+     * @param _cursor The starting address in the linked list.
+     *                If unspecified, starts from the top of the linked list
+     * @param _howMany The maximum number of addresses to retrieve.
      * @return list of addresses denied from calling.
      */
-    function listCallDenied() external view returns (address[] memory) {
-        return _listSkippingEmpty(_callDeniedListKeys);
+    function listCallDenied(address _cursor, uint256 _howMany) external view returns (address[] memory) {
+        return _paginate(_callDeniedList, _cursor, _howMany);
     }
 
     /**
-     * @dev Internal function to add an address to the array.
-     * @param array The array to add the address.
-     * @param _addr The address to be added.
+     * @dev Internal function to add an address to a linked list.
+     * @param _list The linked list.
+     * @param _addr The address to add.
      */
-    function _addAddressToArray(address[] storage array, address _addr) private {
-        // find empty index
-        (bool found, uint256 index) = _findFirstIndex(array, address(0));
-        if (found) {
-            array[index] = _addr;
-        } else {
-            array.push(_addr);
+    function _add(mapping(address => address) storage _list, address _addr) private {
+        require(_addr != address(0), "EAC: addr is zero");
+        require(_addr != address(this), "EAC: addr is self");
+        require(_addr != SENTINEL, "EAC: addr is sentinel");
+        require(_list[_addr] == address(0), "EAC: already exists");
+
+        _list[_addr] = _list[SENTINEL];
+        _list[SENTINEL] = _addr;
+    }
+
+    /**
+     * @dev Internal function to remove an address from a linked list.
+     * @param _list The linked list.
+     * @param _addr The address to remove.
+     * @param _prev The previous address in the linked list.
+     *              If unspecified, traversing the linked list may cause an out-of-gas error.
+     */
+    function _remove(mapping(address => address) storage _list, address _addr, address _prev) private {
+        require(_addr != address(0), "EAC: addr is zero");
+        require(_addr != SENTINEL, "EAC: addr is sentinel");
+        require(_list[_addr] != address(0), "EAC: not found");
+
+        if (_prev == address(0)) {
+            _prev = _findPrev(_list, _addr);
         }
+        require(_list[_prev] == _addr, "EAC: prev address does not match");
+
+        _list[_prev] = _list[_addr];
+        _list[_addr] = address(0);
     }
 
     /**
-     * @dev Internal function to remove an address from the array.
-     * @param array The array to remove the address.
-     * @param _addr The address to be removed.
+     * @dev Internal function to check if an address is in a linked list.
+     * @param _list The linked list.
+     * @param _addr The address to check.
+     * @return True if the address is in the list, false otherwise.
      */
-    function _removeAddressFromArray(address[] storage array, address _addr) private {
-        // find the index of the address
-        (bool found, uint256 index) = _findFirstIndex(array, _addr);
-        if (found) {
-            // set the address to zero
-            array[index] = address(0);
-        } else {
-            revert("EAC: index not found");
+    function _contains(mapping(address => address) storage _list, address _addr) private view returns (bool) {
+        return _list[_addr] != address(0);
+    }
+
+    /**
+     * @dev Internal function to retrieve a list of addresses from a linked list.
+     * @param _list The linked list.
+     * @param _cursor The starting address in the linked list.
+     *                If unspecified, starts from the top of the linked list
+     * @param _howMany The maximum number of addresses to retrieve.
+     * @return An array of addresses.
+     */
+    function _paginate(
+        mapping(address => address) storage _list,
+        address _cursor,
+        uint256 _howMany
+    ) private view returns (address[] memory) {
+        if (_cursor == address(0)) {
+            _cursor = SENTINEL;
         }
-    }
 
-    /**
-     * @dev Internal function to find the first index of the address in the array.
-     * @param array The array to find the address.
-     * @param _addr The address to find.
-     * @return bool indicating if the address is found, uint256 index of the address.
-     */
-    function _findFirstIndex(address[] storage array, address _addr) private view returns (bool, uint256) {
-        for (uint256 i = 0; i < array.length; ++i) {
-            if (array[i] == _addr) {
-                return (true, i);
+        address[] memory ret = new address[](_howMany);
+        for (uint256 i = 0; i < _howMany; ++i) {
+            _cursor = _list[_cursor];
+            if (_cursor == SENTINEL) {
+                break;
             }
+            ret[i] = _cursor;
         }
-        return (false, type(uint256).max);
+        return ret;
     }
 
     /**
-     * @dev Internal function to list the addresses in the array skipping empty addresses.
-     * @param array The array to list the addresses.
-     * @return list of addresses.
+     * @dev Internal function to find the previous address in a linked list.
+     * @param _list The linked list.
+     * @param _addr The address whose previous address is to be found.
+     * @return The previous address in the list.
      */
-    function _listSkippingEmpty(address[] storage array) private view returns (address[] memory) {
-        address[] memory list = new address[](array.length);
-        uint256 listIndex = 0;
-        for (uint256 i = 0; i < array.length; ++i) {
-            if (array[i] == address(0)) {
-                continue;
+    function _findPrev(mapping(address => address) storage _list, address _addr) private view returns (address) {
+        address current = SENTINEL;
+        while (_list[current] != SENTINEL) {
+            if (_list[current] == _addr) {
+                return current;
             }
-            list[listIndex] = array[i];
-            ++listIndex;
+            current = _list[current];
         }
-        return list;
+        revert("EAC: prev address not found");
     }
 }
