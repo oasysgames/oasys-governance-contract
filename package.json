@@ -1,7 +1,7 @@
 {
   "name": "oasys-governance-contract",
   "description": "Contracts governing the Oasys ecosystem",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "scripts": {
     "build": "hardhat compile",
     "test": "hardhat test",
