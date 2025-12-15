@@ -80,8 +80,8 @@ contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
     }
 
     /***************************************************************
-     * Overrides from EVMAccessControl
-     * Revert with NotImplemented() as these functions are not used.
+     * Overrides from the EVMAccessControl contract. Then,
+     * revert with NotImplemented() to prevent misuse.
      ***************************************************************/
 
     function addCreateAllowedList(address /* _addr */) external pure override {
