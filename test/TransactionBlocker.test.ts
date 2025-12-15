@@ -12,7 +12,14 @@ const leftPadAddressToBytes32 = (address: string) => {
   const paddedAddress = '0'.repeat(64 - cleanAddress.length) + cleanAddress
   return '0x' + paddedAddress
 }
-const shuffle = <T>(arr: T[]) => arr.sort(() => Math.random() - Math.random())
+const shuffle = <T>(arr: T[]) => {
+  // Fisher-Yates shuffle
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 describe('TransactionBlocker', function () {
   async function deployContractsFixture() {
