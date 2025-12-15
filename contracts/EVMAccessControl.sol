@@ -31,13 +31,13 @@ contract EVMAccessControl is AccessControl {
      * @dev linked list of addresses allowed to execute create
      * Never change the slot of this variable, as this value is directly accessed by storage key.
      */
-    mapping(address => address) private _createAllowedList;
+    mapping(address => address) internal _createAllowedList;
 
     /**
      * @dev linked list of addresses denied from calling
      * Never change the slot of this variable, as this value is directly accessed by storage key.
      */
-    mapping(address => address) private _callDeniedList;
+    mapping(address => address) internal _callDeniedList;
 
     /**********
      * Events *
@@ -87,7 +87,7 @@ contract EVMAccessControl is AccessControl {
      * Can only be called by an account with `MANAGER_ROLE`.
      * @param _addr The address to be added to the allowed create list.
      */
-    function addCreateAllowedList(address _addr) external onlyRole(MANAGER_ROLE) {
+    function addCreateAllowedList(address _addr) external virtual onlyRole(MANAGER_ROLE) {
         _add(_createAllowedList, _addr);
         emit CreateAllowed(_addr);
     }
@@ -99,7 +99,7 @@ contract EVMAccessControl is AccessControl {
      * @param _prev The previous address in the linked list.
      *              If unspecified, traversing the linked list may cause an out-of-gas error.
      */
-    function removeCreateAllowedList(address _addr, address _prev) external onlyRole(MANAGER_ROLE) {
+    function removeCreateAllowedList(address _addr, address _prev) external virtual onlyRole(MANAGER_ROLE) {
         _remove(_createAllowedList, _addr, _prev);
         emit CreateDenied(_addr);
     }
@@ -109,7 +109,7 @@ contract EVMAccessControl is AccessControl {
      * Can only be called by an account with `MANAGER_ROLE`.
      * @param _addr The address to be added to the denied call list.
      */
-    function addCallDeniedList(address _addr) external onlyRole(MANAGER_ROLE) {
+    function addCallDeniedList(address _addr) external virtual onlyRole(MANAGER_ROLE) {
         _add(_callDeniedList, _addr);
         emit CallDenied(_addr);
     }
@@ -121,7 +121,7 @@ contract EVMAccessControl is AccessControl {
      * @param _prev The previous address in the linked list.
      *              If unspecified, traversing the linked list may cause an out-of-gas error.
      */
-    function removeCallDeniedList(address _addr, address _prev) external onlyRole(MANAGER_ROLE) {
+    function removeCallDeniedList(address _addr, address _prev) external virtual onlyRole(MANAGER_ROLE) {
         _remove(_callDeniedList, _addr, _prev);
         emit CallAllowed(_addr);
     }
@@ -131,7 +131,7 @@ contract EVMAccessControl is AccessControl {
      * @param _addr The address to check.
      * @return bool indicating if the address is allowed to create.
      */
-    function isAllowedToCreate(address _addr) external view returns (bool) {
+    function isAllowedToCreate(address _addr) external view virtual returns (bool) {
         return _contains(_createAllowedList, _addr);
     }
 
@@ -140,7 +140,7 @@ contract EVMAccessControl is AccessControl {
      * @param _addr The address to check.
      * @return bool indicating if the address is denied.
      */
-    function isDeniedToCall(address _addr) external view returns (bool) {
+    function isDeniedToCall(address _addr) external view virtual returns (bool) {
         return _contains(_callDeniedList, _addr);
     }
 
@@ -151,7 +151,7 @@ contract EVMAccessControl is AccessControl {
      * @param _howMany The maximum number of addresses to retrieve.
      * @return list of addresses allowed to execute create.
      */
-    function listCreateAllowed(address _cursor, uint256 _howMany) external view returns (address[] memory) {
+    function listCreateAllowed(address _cursor, uint256 _howMany) external view virtual returns (address[] memory) {
         return _paginate(_createAllowedList, _cursor, _howMany);
     }
 
@@ -162,7 +162,7 @@ contract EVMAccessControl is AccessControl {
      * @param _howMany The maximum number of addresses to retrieve.
      * @return list of addresses denied from calling.
      */
-    function listCallDenied(address _cursor, uint256 _howMany) external view returns (address[] memory) {
+    function listCallDenied(address _cursor, uint256 _howMany) external view virtual returns (address[] memory) {
         return _paginate(_callDeniedList, _cursor, _howMany);
     }
 
@@ -171,7 +171,7 @@ contract EVMAccessControl is AccessControl {
      * @param _list The linked list.
      * @param _addr The address to add.
      */
-    function _add(mapping(address => address) storage _list, address _addr) private {
+    function _add(mapping(address => address) storage _list, address _addr) internal {
         require(_addr != address(0), "EAC: addr is zero");
         require(_addr != address(this), "EAC: addr is self");
         require(_addr != SENTINEL, "EAC: addr is sentinel");
@@ -188,7 +188,7 @@ contract EVMAccessControl is AccessControl {
      * @param _prev The previous address in the linked list.
      *              If unspecified, traversing the linked list may cause an out-of-gas error.
      */
-    function _remove(mapping(address => address) storage _list, address _addr, address _prev) private {
+    function _remove(mapping(address => address) storage _list, address _addr, address _prev) internal {
         require(_addr != address(0), "EAC: addr is zero");
         require(_addr != SENTINEL, "EAC: addr is sentinel");
         require(_list[_addr] != address(0), "EAC: not found");
@@ -208,7 +208,7 @@ contract EVMAccessControl is AccessControl {
      * @param _addr The address to check.
      * @return True if the address is in the list, false otherwise.
      */
-    function _contains(mapping(address => address) storage _list, address _addr) private view returns (bool) {
+    function _contains(mapping(address => address) storage _list, address _addr) internal view returns (bool) {
         return _list[_addr] != address(0);
     }
 
@@ -224,7 +224,7 @@ contract EVMAccessControl is AccessControl {
         mapping(address => address) storage _list,
         address _cursor,
         uint256 _howMany
-    ) private view returns (address[] memory) {
+    ) internal view returns (address[] memory) {
         if (_cursor == address(0)) {
             _cursor = SENTINEL;
         }
@@ -246,7 +246,7 @@ contract EVMAccessControl is AccessControl {
      * @param _addr The address whose previous address is to be found.
      * @return The previous address in the list.
      */
-    function _findPrev(mapping(address => address) storage _list, address _addr) private view returns (address) {
+    function _findPrev(mapping(address => address) storage _list, address _addr) internal view returns (address) {
         address current = SENTINEL;
         while (_list[current] != SENTINEL) {
             if (_list[current] == _addr) {
