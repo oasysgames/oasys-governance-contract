@@ -25,7 +25,7 @@ interface ITransactionBlocker {
     /**
      * @notice Sets the global blocking state for all transactions
      * @param _isBlockedAll True to block all transactions, false to allow transactions (subject to address-level blocking)
-     * @dev Only callable by operators
+     * @dev Only callable by managers
      */
     function setBlockedAll(bool _isBlockedAll) external;
 
