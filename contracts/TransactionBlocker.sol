@@ -11,12 +11,15 @@ import {EVMAccessControl} from "./EVMAccessControl.sol";
  * To minimize changes, reuse the code from EVMAccessControl as much as possible.
  */
 contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
-    /// @notice Global flag indicating whether all transactions are blocked.
-    /// @dev Slot number is `3`. Do not change. This is hardcoded in the oasys-validator side.
-    bool public isBlockedAll;
-
     // Don't use this mapping directly. Use the `_createAllowedList` mapping from EVMAccessControl for the `_blockedList` purpose.
     // mapping(address => address) internal _blockedList;
+
+    // Do not use this variable. Use the `_callDeniedList` mapping from EVMAccessControl for the `isBlockedAll` purpose.
+    // bool public isBlockedAll;
+
+    /// @notice The address that represents all transactions are blocked.
+    /// @dev This address is 0xffffffffffffffffffffffffffffffffffffffff.
+    address public constant BLOCKED_ALL_ADDRESS = address(type(uint160).max);
 
     /**
      * @notice Constructor.
@@ -25,16 +28,6 @@ contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
      */
     // solhint-disable-next-line no-empty-blocks
     constructor(address[] memory admins, address[] memory managers) EVMAccessControl(admins, managers) {}
-
-    /**
-     * @notice Sets the global blocking state for all transactions.
-     * @param _isBlockedAll True to block all transactions, false to allow transactions (subject to address-level blocking).
-     * @dev Only callable by managers.
-     */
-    function setBlockedAll(bool _isBlockedAll) external virtual override onlyRole(MANAGER_ROLE) {
-        isBlockedAll = _isBlockedAll;
-        emit BlockedAllSet(_isBlockedAll);
-    }
 
     /**
      * @notice Adds an address to the blocked list.
@@ -58,6 +51,22 @@ contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
     }
 
     /**
+     * @notice Sets the global blocking state for all transactions.
+     * @param _isBlockedAll True to block all transactions, false to allow transactions (subject to address-level blocking).
+     * @dev Only callable by managers.
+     * @dev The `isBlockedAll` flag is expressed by the `_callDeniedList` mapping.
+     *      If the `BLOCKED_ALL_ADDRESS` is in the `_callDeniedList` mapping, then all transactions are blocked.
+     */
+    function setBlockedAll(bool _isBlockedAll) external virtual override onlyRole(MANAGER_ROLE) {
+        if (_isBlockedAll) {
+            _add(_callDeniedList, BLOCKED_ALL_ADDRESS);
+        } else {
+            _remove(_callDeniedList, BLOCKED_ALL_ADDRESS, SENTINEL);
+        }
+        emit BlockedAllSet(_isBlockedAll);
+    }
+
+    /**
      * @notice Checks if an address is blocked.
      * @param addr The address to check.
      * @return True if the address is blocked, false otherwise.
@@ -77,6 +86,14 @@ contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
         uint256 _howMany
     ) external view virtual override returns (address[] memory) {
         return _paginate(_createAllowedList, _cursor, _howMany);
+    }
+
+    /**
+     * @notice Checks if all transactions are blocked.
+     * @return True if all transactions are blocked, false otherwise.
+     */
+    function isBlockedAll() external view virtual override returns (bool) {
+        return _contains(_callDeniedList, BLOCKED_ALL_ADDRESS);
     }
 
     /***************************************************************

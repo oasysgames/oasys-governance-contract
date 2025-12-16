@@ -19,16 +19,6 @@ interface ITransactionBlocker {
     /// @param isBlockedAll The new global blocking state
     event BlockedAllSet(bool isBlockedAll);
 
-    /// @notice Global flag indicating whether all transactions are blocked
-    function isBlockedAll() external view returns (bool);
-
-    /**
-     * @notice Sets the global blocking state for all transactions
-     * @param _isBlockedAll True to block all transactions, false to allow transactions (subject to address-level blocking)
-     * @dev Only callable by managers
-     */
-    function setBlockedAll(bool _isBlockedAll) external;
-
     /**
      * @notice Blocks a single address from executing transactions
      * @param addr The address to block
@@ -46,6 +36,13 @@ interface ITransactionBlocker {
     function removeBlockedList(address addr, address prev) external;
 
     /**
+     * @notice Sets the global blocking state for all transactions
+     * @param _isBlockedAll True to block all transactions, false to allow transactions (subject to address-level blocking)
+     * @dev Only callable by managers
+     */
+    function setBlockedAll(bool _isBlockedAll) external;
+
+    /**
      * @notice Checks if an address is blocked
      * @param addr The address to check
      * @return True if the address is blocked, false otherwise
@@ -60,4 +57,11 @@ interface ITransactionBlocker {
      * @return list of blocked addresses
      */
     function listBlockedAddresses(address _cursor, uint256 _howMany) external view returns (address[] memory);
+
+
+    /**
+     * @notice Checks if all transactions are blocked
+     * @return True if all transactions are blocked, false otherwise
+     */
+    function isBlockedAll() external view returns (bool);
 }
