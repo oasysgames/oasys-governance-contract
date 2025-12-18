@@ -251,7 +251,7 @@ describe('TransactionBlocker', function () {
       await expect(blocker.connect(admins[0]).grantRole(adminRole, contractAddress))
         .to.emit(blocker, 'RoleGranted')
         .withArgs(adminRole, contractAddress, admins[0].address)
-      expect(await blocker.hasRole(adminRole, contractAddress)).to.true
+      expect(await blocker.hasRole(adminRole, contractAddress)).to.be.true
     })
   })
 
