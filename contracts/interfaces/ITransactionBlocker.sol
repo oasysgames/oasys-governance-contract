@@ -58,7 +58,6 @@ interface ITransactionBlocker {
      */
     function listBlockedAddresses(address _cursor, uint256 _howMany) external view returns (address[] memory);
 
-
     /**
      * @notice Checks if all transactions are blocked
      * @return True if all transactions are blocked, false otherwise
