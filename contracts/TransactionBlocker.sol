@@ -30,6 +30,21 @@ contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
     constructor(address[] memory admins, address[] memory managers) EVMAccessControl(admins, managers) {}
 
     /**
+     * @notice Grants a role to an account.
+     * @param role The role to grant.
+     * @param account The account to grant the role to.
+     * @dev For the purpose of keeping the oasys-validator side simple, the manager must be an EOA.
+     *      To ensure this restriction is not overlooked, we enforce it directly in the code.
+     */
+    function grantRole(bytes32 role, address account) public override {
+        // Restrict the manager role to EOAs only
+        if (role == MANAGER_ROLE && !_isEOA(account)) {
+            revert("not EOA for manager role");
+        }
+        super.grantRole(role, account);
+    }
+
+    /**
      * @notice Adds an address to the blocked list.
      * @param addr The address to block.
      * @dev Only callable by managers.
@@ -94,6 +109,15 @@ contract TransactionBlocker is ITransactionBlocker, EVMAccessControl {
      */
     function isBlockedAll() external view virtual override returns (bool) {
         return _contains(_callDeniedList, BLOCKED_ALL_ADDRESS);
+    }
+
+    /**
+     * @notice Checks if an address is an EOA.
+     * @param account The address to check.
+     * @return True if the address is an EOA, false otherwise.
+     */
+    function _isEOA(address account) internal view returns (bool) {
+        return account.code.length == 0;
     }
 
     /***************************************************************

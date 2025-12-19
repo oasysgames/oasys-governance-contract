@@ -230,6 +230,29 @@ describe('TransactionBlocker', function () {
         `AccessControl: account ${managers[1].address.toLowerCase()} is missing role ${adminRole}`,
       )
     })
+
+    it('Should revert when granting manager role to a contract address', async function () {
+      const { blocker, admins, managerRole } = await loadFixture(deployContractsFixture)
+
+      // Use the blocker contract address itself as a non-EOA
+      const contractAddress = await blocker.getAddress()
+
+      await expect(blocker.connect(admins[0]).grantRole(managerRole, contractAddress)).to.be.revertedWith(
+        'not EOA for manager role',
+      )
+    })
+
+    it('Should succeed to grant admin role to a contract address', async function () {
+      const { blocker, admins, adminRole } = await loadFixture(deployContractsFixture)
+
+      // Admin role should not have the EOA restriction
+      const contractAddress = await blocker.getAddress()
+
+      await expect(blocker.connect(admins[0]).grantRole(adminRole, contractAddress))
+        .to.emit(blocker, 'RoleGranted')
+        .withArgs(adminRole, contractAddress, admins[0].address)
+      expect(await blocker.hasRole(adminRole, contractAddress)).to.be.true
+    })
   })
 
   describe('revokeRole', function () {
